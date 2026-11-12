@@ -4,7 +4,7 @@
 -- 运行：lua test/openui_skeleton_test.lua（仓库任意位置可执行）
 
 local HERE = (arg[0]:match("^(.*)[/\\]") or ".")
-local ADDON = HERE .. "/../OpenUI"
+local ADDON = HERE .. "/.." -- 包根即仓库根（D54）
 
 local ns = {}
 local output = {} -- print 捕获
