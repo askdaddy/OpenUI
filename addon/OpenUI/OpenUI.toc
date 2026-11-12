@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: OpenUI
+## Notes: Modern flat dark UI replacement. Type /openui for status.
+## Notes-zhCN: 现代扁平暗色界面替换框架。输入 /openui 查看状态。
+## Author: askdaddy
+## Version: 2026.11.0-dev.1
+## SavedVariables: OpenUIDB
+
+Init.lua
+Locales\enUS.lua
+Locales\zhCN.lua
+Config\Defaults.lua
+Core\Core.lua
+Core\Slash.lua
+UI\Theme.lua
