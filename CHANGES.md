@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 本地化模块：`OpenUIDB.locale`（auto/enUS/zhCN，默认 auto）手动语言选择并**即时生效**（L 原地重建、表身份不变，消费者零改动）；locale 资源表化（enUS 基表与 zhCN 覆盖表常驻 `OpenUI.Locales`）；非法值软失败按 auto 兜底不清洗用户数据（#4）。
 - 主题系统 T1：17 个语义 token 六族预设（颜色/透明度/字体字号/边框/间距/尺寸，扁平暗色默认值冻结）、模块运行时覆盖与分别重置（不落库）、`OpenUIDB.theme` 全局定制持久化、非法值软失败进诊断队列；`GetColor/GetFont` 兼容视图保持既有行为（#3）。
 - 初始插件骨架：TOC 显式加载（Interface 16001）、命名空间、模块注册表与 OnInitialize/OnEnable/OnDisable 生命周期、回调错误隔离（#1）。
 - 新增 `/openui`（回显版本与模块列表）与 `/openui errors`（错误队列）命令。
