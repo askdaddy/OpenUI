@@ -13,4 +13,5 @@ if GetLocale() == "zhCN" then
     L.ERRORS_ITEM = "%d. %s"
     L.MODULE_DUPLICATE = "模块已注册："
     L.MODULE_INVALID = "无效模块名："
+    L.THEME_INVALID = "无效的主题值已忽略：%s"
 end
