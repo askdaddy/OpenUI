@@ -7,6 +7,7 @@ local OpenUI = ns.OpenUI
 local defaults = {
     configVersion = 1,
     debug = false,
+    theme = {}, -- token -> 用户全局定制值（#3）；键集见 UI/Theme.lua PRESET
 }
 
 local function merge(target, source)

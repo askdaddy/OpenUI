@@ -17,5 +17,6 @@ L.ERRORS_HEADER = "Recorded errors (%d):"
 L.ERRORS_ITEM = "%d. %s"
 L.MODULE_DUPLICATE = "module already registered: "
 L.MODULE_INVALID = "invalid module name: "
+L.THEME_INVALID = "Invalid theme value ignored: %s"
 
 OpenUI.L = L
