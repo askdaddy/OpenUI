@@ -9,6 +9,7 @@ local defaults = {
     debug = false,
     locale = "auto", -- auto | enUS | zhCN（D18/#4）：跟随客户端或手动选择
     theme = {}, -- token -> 用户全局定制值（#3）；键集见 UI/Theme.lua PRESET
+    modules = { enabled = {} }, -- 注册名 -> bool（#6）；缺省按 DEFAULT_ENABLED 组合
 }
 
 local function merge(target, source)

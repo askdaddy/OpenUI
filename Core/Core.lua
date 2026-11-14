@@ -1,4 +1,5 @@
 -- 核心最小实现（spec C5/C7）：模块注册表 + 三段生命周期 + 错误隔离。
+-- #6 增量：启停配置驱动生命周期筛选、Enable/Disable 状态机、战斗中意图队列。
 -- OnDisable 的契约是"恢复原生界面"；骨架不含界面模块，契约先行。
 
 local _, ns = ...
@@ -47,16 +48,100 @@ function OpenUI:GetModule(name)
     return module
 end
 
+-- ==== 启停配置（#6，修订 v2：注册时声明默认值）====
+-- 解析顺序：DB 显式值 -> 模块注册时的 defaultEnabled（缺省 true，保持 #1
+-- 「注册即参与生命周期」契约）-> 未注册名视为关；Core 恒开不可关。
+-- B1+/工具模块注册时声明 defaultEnabled = false（D07「其他默认关闭」）。
+
+local initialized = {}   -- 注册名 -> 是否已执行过 OnInitialize
+local pendingSwitches = {} -- 注册名 -> 最新启停意图（战斗中登记，脱战后应用）
+
+local function setEnabled(name, value)
+    local db = _G.OpenUIDB
+    if type(db) ~= "table" then db = {}; _G.OpenUIDB = db end
+    if type(db.modules) ~= "table" then db.modules = {} end
+    if type(db.modules.enabled) ~= "table" then db.modules.enabled = {} end
+    db.modules.enabled[name] = value
+end
+
+function OpenUI:IsModuleEnabled(name)
+    if name == "Core" then return true end
+    local module = self.modules[name]
+    if not module then return false end
+    local db = _G.OpenUIDB
+    local saved = db and db.modules and db.modules.enabled and db.modules.enabled[name]
+    if saved ~= nil then return saved end
+    return module.defaultEnabled ~= false
+end
+
+-- 战斗锁定查询（#6 Q2）：API 不存在时保守返回 true（行为退化为即时）。
+function OpenUI:CanModifyNow()
+    if type(InCombatLockdown) == "function" then
+        return not InCombatLockdown()
+    end
+    return true
+end
+
+-- 脱战后应用意图队列（由 Resources 的核心自有 PLAYER_REGEN_ENABLED 监听触发）。
+function OpenUI.ApplyPendingSwitches()
+    for name, want in pairs(pendingSwitches) do
+        pendingSwitches[name] = nil
+        if want then
+            OpenUI:EnableModule(name)
+        else
+            OpenUI:DisableModule(name)
+        end
+    end
+end
+
+-- 启停状态机：状态先行、回调 Run 隔离（失败只进诊断，状态保持一致）。
+function OpenUI:EnableModule(name)
+    if name == "Core" then return false end
+    local module = self:GetModule(name) -- 未注册名报错
+    if self:IsModuleEnabled(name) then
+        pendingSwitches[name] = nil -- 最新命令（启用）取消挂起的禁用意图
+        return true
+    end
+    if not self:CanModifyNow() then
+        pendingSwitches[name] = true
+        return false
+    end
+    setEnabled(name, true)
+    if not initialized[name] then
+        initialized[name] = true
+        Run(name .. "/OnInitialize", module.OnInitialize, module)
+    end
+    Run(name .. "/OnEnable", module.OnEnable, module)
+    return true
+end
+
 function OpenUI:DisableModule(name)
+    if name == "Core" then return false end
     local module = self:GetModule(name)
+    if not self:IsModuleEnabled(name) then
+        pendingSwitches[name] = nil -- 最新命令（禁用）取消挂起的启用意图
+        return true
+    end
+    if not self:CanModifyNow() then
+        pendingSwitches[name] = false
+        return false
+    end
+    setEnabled(name, false)
+    if OpenUI.Release then OpenUI.Release(name) end -- 先释放资源，再回调（#6 design 边界 7）
     Run(name .. "/OnDisable", module.OnDisable, module)
+    return true
 end
 
 local function callAll(method)
     for _, module in ipairs(OpenUI.moduleOrder) do
-        local func = module[method]
-        if type(func) == "function" then
-            Run(module.name .. "/" .. method, func, module)
+        if OpenUI:IsModuleEnabled(module.name) then
+            if method == "OnInitialize" then
+                initialized[module.name] = true
+            end
+            local func = module[method]
+            if type(func) == "function" then
+                Run(module.name .. "/" .. method, func, module)
+            end
         end
     end
 end
@@ -65,7 +150,7 @@ end
 OpenUI:RegisterModule("Core")
 
 -- 生命周期：ADDON_LOADED（本插件，SavedVariables 就绪）-> OnInitialize；
--- PLAYER_LOGIN -> OnEnable。
+-- PLAYER_LOGIN -> OnEnable。仅启用模块参与（#6）。
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
