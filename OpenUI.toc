@@ -13,6 +13,7 @@ Config\Defaults.lua
 Core\Core.lua
 Core\Resources.lua
 Core\Slash.lua
+Config\Profile.lua
 Locales\Manager.lua
 UI\Theme.lua
 UI\Widgets.lua
