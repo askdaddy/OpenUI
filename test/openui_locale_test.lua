@@ -91,8 +91,8 @@ local Loc = OpenUI.Locale
 print("== S1 资源表与双语文案（步骤 1）==")
 check(type(OpenUI.Locales) == "table" and type(OpenUI.Locales.enUS) == "table"
     and type(OpenUI.Locales.zhCN) == "table", "Locales.enUS/zhCN 资源表存在")
-check(count(OpenUI.Locales.enUS) == 24, "enUS key 计数 = 24（#8 设置文案；实际 " .. count(OpenUI.Locales.enUS) .. "）")
-check(count(OpenUI.Locales.zhCN) == 24, "zhCN key 计数 = 24（#8 设置文案；实际 " .. count(OpenUI.Locales.zhCN) .. "）")
+check(count(OpenUI.Locales.enUS) == 26, "enUS key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.enUS) .. "）")
+check(count(OpenUI.Locales.zhCN) == 26, "zhCN key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.zhCN) .. "）")
 check(L.LOCALE_INVALID:find("%%s") ~= nil and L.LOCALE_INVALID:find("Invalid", 1, true) ~= nil,
     "enUS LOCALE_INVALID 为含 %s 的英文串")
 local zh = OpenUI.Locales.zhCN
@@ -171,7 +171,7 @@ check(#mismatch == 0, "双语占位符序列一致" .. (#mismatch > 0 and "（�
 local production = {
     "Init.lua", "Locales/enUS.lua", "Locales/zhCN.lua", "Locales/Manager.lua",
     "Config/Defaults.lua", "Core/Core.lua", "Core/Slash.lua", "UI/Theme.lua",
-    "UI/Widgets.lua", "UI/Settings.lua",
+    "UI/Widgets.lua", "UI/Settings.lua", "UI/Diagnostics.lua",
 }
 local missingRefs = {}
 for _, sf in ipairs(production) do
