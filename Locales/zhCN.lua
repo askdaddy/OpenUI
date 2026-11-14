@@ -33,6 +33,9 @@ local zhCN = {
     SETTINGS_HINT = "修改即时生效。",
     SETTINGS_CLOSE = "关闭",
     SETTINGS_ERRORS_COUNT = "已记录错误：%d 条",
+    -- 诊断窗口（#10）
+    DIAG_TITLE = "OpenUI 诊断",
+    DIAG_COPY_HINT = "选中文本后按 Ctrl+C 复制。",
 }
 OpenUI.Locales.zhCN = zhCN
 

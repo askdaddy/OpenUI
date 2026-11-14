@@ -26,6 +26,8 @@ SlashCmdList["OPENUI"] = function(msg)
                 print(L.ERRORS_ITEM:format(i, err))
             end
         end
+        -- #10：追加可复制视图（未加载时零影响）
+        if OpenUI.Diagnostics then OpenUI.Diagnostics.Open() end
         return
     end
     print(L.VERSION_LINE:format(OpenUI.version))
