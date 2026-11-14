@@ -56,20 +56,33 @@ end
 local initialized = {}   -- 注册名 -> 是否已执行过 OnInitialize
 local pendingSwitches = {} -- 注册名 -> 最新启停意图（战斗中登记，脱战后应用）
 
-local function setEnabled(name, value)
+-- 生效配置（#9）：优先当前配置档（Profile）；未迁移/未加载时回退 legacy 顶层键。
+local function activeConfig(create)
+    if OpenUI.Profile and OpenUI.Profile.Config then
+        local cfg = OpenUI.Profile.Config()
+        if type(cfg) == "table" then return cfg end
+    end
     local db = _G.OpenUIDB
-    if type(db) ~= "table" then db = {}; _G.OpenUIDB = db end
-    if type(db.modules) ~= "table" then db.modules = {} end
-    if type(db.modules.enabled) ~= "table" then db.modules.enabled = {} end
-    db.modules.enabled[name] = value
+    if type(db) == "table" then return db end
+    if not create then return nil end
+    _G.OpenUIDB = {}
+    return _G.OpenUIDB
+end
+
+local function setEnabled(name, value)
+    local cfg = activeConfig(true)
+    if type(cfg.modules) ~= "table" then cfg.modules = {} end
+    if type(cfg.modules.enabled) ~= "table" then cfg.modules.enabled = {} end
+    cfg.modules.enabled[name] = value
 end
 
 function OpenUI:IsModuleEnabled(name)
     if name == "Core" then return true end
     local module = self.modules[name]
     if not module then return false end
-    local db = _G.OpenUIDB
-    local saved = db and db.modules and db.modules.enabled and db.modules.enabled[name]
+    local cfg = activeConfig(false)
+    local enabled = cfg and cfg.modules and cfg.modules.enabled
+    local saved = enabled and enabled[name]
     if saved ~= nil then return saved end
     return module.defaultEnabled ~= false
 end

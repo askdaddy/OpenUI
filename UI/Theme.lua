@@ -167,9 +167,28 @@ local legacyColorNames = {
     warn = "color.warn", danger = "color.danger",
 }
 
-local function savedTheme()
+-- 生效配置（#9）：优先当前配置档（Profile）；未迁移/未加载时回退 legacy 顶层键。
+local function activeConfig(create)
+    if OpenUI.Profile and OpenUI.Profile.Config then
+        local cfg = OpenUI.Profile.Config()
+        if type(cfg) == "table" then return cfg end
+    end
     local db = _G.OpenUIDB
-    return db and db.theme or nil
+    if type(db) == "table" then return db end
+    if not create then return nil end
+    _G.OpenUIDB = {}
+    return _G.OpenUIDB
+end
+
+local function savedTheme()
+    local cfg = activeConfig(false)
+    return cfg and cfg.theme or nil
+end
+
+local function themeTable()
+    local cfg = activeConfig(true)
+    if type(cfg.theme) ~= "table" then cfg.theme = {} end
+    return cfg.theme
 end
 
 local function currentPaletteName()
@@ -248,9 +267,7 @@ function Theme.Set(token, value)
         return false
     end
     local target = colorTokenOf(token) or token
-    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
-    if type(_G.OpenUIDB.theme) ~= "table" then _G.OpenUIDB.theme = {} end
-    _G.OpenUIDB.theme[target] = copy(value)
+    themeTable()[target] = copy(value)
     rebuild()
     return true
 end
@@ -261,7 +278,8 @@ function Theme.Reset(token)
         Diagnose.Report("Theme", L.THEME_INVALID:format(tostring(token)))
         return false
     end
-    local theme = _G.OpenUIDB and _G.OpenUIDB.theme
+    local cfg = activeConfig(false)
+    local theme = cfg and cfg.theme
     if type(theme) == "table" then
         theme[token] = nil
         local target = colorTokenOf(token)
@@ -304,9 +322,7 @@ function Theme.SetPalette(name)
         Diagnose.Report("Theme", L.THEME_INVALID:format(tostring(name)))
         return false
     end
-    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
-    if type(_G.OpenUIDB.theme) ~= "table" then _G.OpenUIDB.theme = {} end
-    _G.OpenUIDB.theme.palette = name
+    themeTable().palette = name
     rebuild()
     return true
 end
@@ -326,7 +342,7 @@ OpenUI.Theme = Theme
 
 -- 旧 token 定制迁移（#7 A4）：旧键值复制到 M3 角色键；旧键保留不清洗。
 local function migrateLegacyCustomizations()
-    local theme = _G.OpenUIDB and _G.OpenUIDB.theme
+    local theme = savedTheme()
     if type(theme) ~= "table" then return end
     for alias, target in pairs(COLOR_ALIASES) do
         if theme[alias] ~= nil and theme[target] == nil then
