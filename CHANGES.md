@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 诊断增强：`/openui errors` 保留聊天输出并额外打开**可复制堆栈查看窗口**（多行 EditBox，编号条目含完整 debugstack，选中 Ctrl+C 复制；空队列显示无错误提示；单实例、拖拽/ESC 关闭、`Diagnostics` 模块默认启用）；错误队列维持 50 条 FIFO 上限且**不跨会话保留**（运行数据不入档、不写 SavedVariables）（#10）。
 - 配置档 T1：账号级 `OpenUIDB.profiles`（5 共享槽 + 角色独立档 + 持续关联活引用，`Profile.Config/UseSlot/UseIndependent{copy}/DeleteSlot/ConfigFor/Slots`）；删除槽为全部关联角色（含未登录记录）保留删除前副本；首次初始化把 legacy 顶层配置深拷贝迁移进角色独立档（legacy 键保留）；Theme/Locale/Core 读写改经生效配置（未加载 Profile 时回退 legacy）（#9）。
 - 统一设置窗口：裸 `/openui` 开窗（保留版本/模块打印）+ 左侧竖排导航（外观/语言/模块/关于）+ 搜索（匹配页名与设置项、无结果提示）+ 全部选项即时生效；外观页七套配色切换、语言页 Auto/enUS/zhCN、模块页各模块开关（接 #6）、关于页版本/模块/错误计数；控件均来自 `OpenUI.Widgets`（新增 Toggle），配色切换自动换色、语言切换窗口文案即时刷新（#8）。
 - 主题与控件（M3 Expressive）：18 个 M3 语义色角色（surface 层级/on-\*/outline/primary/secondary/tertiary/error）+ **七套可切换暗色配色**（starblue 默认/teal/amber/amethyst/rose/moss/graphite，seed+配方纯 Lua 确定性生成）+ `Theme.SetPalette/GetPalette`（持久化 `OpenUIDB.theme.palette`，非法软失败）；旧 17-token 全部保留为兼容别名并自动迁移旧定制；新增排版角色（type.\* 5 级）、形状等级（shape.\*）、状态层（state.\*，M3 口径）、动效 token（motion.\*）；新增最小控件工厂 `OpenUI.Widgets`（Panel/Button/Text + 换色自动刷新）（#7）。
