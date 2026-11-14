@@ -19,3 +19,4 @@ UI\Theme.lua
 UI\Widgets.lua
 UI\Settings.lua
 UI\Diagnostics.lua
+UI\ActionBars.lua
