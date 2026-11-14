@@ -17,6 +17,22 @@ local enUS = {
     MODULE_INVALID = "invalid module name: ",
     THEME_INVALID = "Invalid theme value ignored: %s",
     LOCALE_INVALID = "Invalid locale ignored: %s",
+    -- 设置窗口（#8）
+    SETTINGS_TITLE = "OpenUI Settings",
+    SETTINGS_SEARCH = "Search settings",
+    SETTINGS_NO_RESULTS = "No matching settings.",
+    SETTINGS_PAGE_APPEARANCE = "Appearance",
+    SETTINGS_PAGE_LANGUAGE = "Language",
+    SETTINGS_PAGE_MODULES = "Modules",
+    SETTINGS_PAGE_ABOUT = "About",
+    SETTINGS_PALETTE = "Palette",
+    SETTINGS_LOCALE = "Language",
+    SETTINGS_LOCALE_AUTO = "Auto (client)",
+    SETTINGS_ON = "On",
+    SETTINGS_OFF = "Off",
+    SETTINGS_HINT = "Changes apply immediately.",
+    SETTINGS_CLOSE = "Close",
+    SETTINGS_ERRORS_COUNT = "Recorded errors: %d",
 }
 OpenUI.Locales.enUS = enUS
 

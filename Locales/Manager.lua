@@ -54,6 +54,8 @@ function Locale.Set(locale)
     if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
     _G.OpenUIDB.locale = locale
     apply(locale)
+    -- 已打开的设置窗口文案即时刷新（#8；未加载时零影响）
+    if OpenUI.Settings and OpenUI.Settings.Refresh then OpenUI.Settings.Refresh() end
     return true
 end
 

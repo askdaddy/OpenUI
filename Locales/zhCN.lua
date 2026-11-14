@@ -17,6 +17,22 @@ local zhCN = {
     MODULE_INVALID = "无效模块名：",
     THEME_INVALID = "无效的主题值已忽略：%s",
     LOCALE_INVALID = "无效的语言设置已忽略：%s",
+    -- 设置窗口（#8）
+    SETTINGS_TITLE = "OpenUI 设置",
+    SETTINGS_SEARCH = "搜索设置",
+    SETTINGS_NO_RESULTS = "没有匹配的设置。",
+    SETTINGS_PAGE_APPEARANCE = "外观",
+    SETTINGS_PAGE_LANGUAGE = "语言",
+    SETTINGS_PAGE_MODULES = "模块",
+    SETTINGS_PAGE_ABOUT = "关于",
+    SETTINGS_PALETTE = "配色",
+    SETTINGS_LOCALE = "语言",
+    SETTINGS_LOCALE_AUTO = "自动（跟随客户端）",
+    SETTINGS_ON = "开",
+    SETTINGS_OFF = "关",
+    SETTINGS_HINT = "修改即时生效。",
+    SETTINGS_CLOSE = "关闭",
+    SETTINGS_ERRORS_COUNT = "已记录错误：%d 条",
 }
 OpenUI.Locales.zhCN = zhCN
 
