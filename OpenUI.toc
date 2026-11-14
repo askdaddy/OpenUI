@@ -11,6 +11,7 @@ Locales\enUS.lua
 Locales\zhCN.lua
 Config\Defaults.lua
 Core\Core.lua
+Core\Resources.lua
 Core\Slash.lua
 Locales\Manager.lua
 UI\Theme.lua
