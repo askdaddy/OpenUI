@@ -90,13 +90,13 @@ local T = OpenUI.Theme
 
 print("== S1 预设注册表与读取（步骤 1）==")
 local tokens = T.Tokens()
-check(#tokens == 17, "Tokens() 计数 = 17（实际 " .. #tokens .. "）")
+check(#tokens == 54, "Tokens() 计数 = 54（M3 角色+旧兼容，#7 基线；实际 " .. #tokens .. "）")
 local allResolved = true
 for _, tok in ipairs(tokens) do
     if T.Get(tok) == nil then allResolved = false end
 end
 check(allResolved, "全部 token Get 非 nil")
-check(colorEq(T.Get("color.bg"), { 0.09, 0.09, 0.11, 1 }), "color.bg 冻结默认值逐元素相等")
+check(colorEq(T.Get("color.bg"), { 0.068, 0.0755, 0.082, 1 }), "color.bg 别名=starblue surface 实测值逐元素相等（#7 基线）")
 check(T.Get("opacity.panel") == 0.95, "opacity.panel == 0.95")
 check(type(T.Get("font.normal")) == "table" and T.Get("font.normal").size == 13
     and T.Get("font.normal").file == nil, "font.normal size=13 且 file 为 nil")
@@ -122,16 +122,16 @@ check(T.Set("no.such", 1) == false, "未知 token Set 返回 false 不抛错")
 print("== S3 模块覆盖与分别重置（步骤 3）==")
 check(T.SetOverride("Bars", "color.bg", { 0, 0, 0, 1 }) == true, "合法覆盖返回 true")
 check(colorEq(T.GetFor("Bars", "color.bg"), { 0, 0, 0, 1 }), "GetFor 取到覆盖值")
-check(colorEq(T.Get("color.bg"), { 0.09, 0.09, 0.11, 1 }), "全局值不受覆盖影响")
-check(colorEq(T.GetFor("Chat", "color.bg"), { 0.09, 0.09, 0.11, 1 }), "其他模块取全局值（隔离）")
+check(colorEq(T.Get("color.bg"), { 0.068, 0.0755, 0.082, 1 }), "全局值不受覆盖影响")
+check(colorEq(T.GetFor("Chat", "color.bg"), { 0.068, 0.0755, 0.082, 1 }), "其他模块取全局值（隔离）")
 check(_G.OpenUIDB.theme["color.bg"] == nil, "覆盖不落 OpenUIDB")
 T.ResetOverride("Bars", "color.bg")
-check(colorEq(T.GetFor("Bars", "color.bg"), { 0.09, 0.09, 0.11, 1 }), "单项重置回全局值")
+check(colorEq(T.GetFor("Bars", "color.bg"), { 0.068, 0.0755, 0.082, 1 }), "单项重置回全局值")
 T.SetOverride("Bars", "spacing.small", 6)
 T.ResetOverride("Bars")
 check(T.GetFor("Bars", "spacing.small") == 4, "无参重置清空该模块全部覆盖")
 check(T.SetOverride("Bars", "color.bg", { 1, 2 }) == false
-    and colorEq(T.GetFor("Bars", "color.bg"), { 0.09, 0.09, 0.11, 1 }),
+    and colorEq(T.GetFor("Bars", "color.bg"), { 0.068, 0.0755, 0.082, 1 }),
     "非法覆盖值返回 false 且不生效")
 
 print("== S4 兼容 shim（步骤 4）==")
