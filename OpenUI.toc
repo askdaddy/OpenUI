@@ -15,3 +15,4 @@ Core\Resources.lua
 Core\Slash.lua
 Locales\Manager.lua
 UI\Theme.lua
+UI\Widgets.lua
