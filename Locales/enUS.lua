@@ -33,6 +33,9 @@ local enUS = {
     SETTINGS_HINT = "Changes apply immediately.",
     SETTINGS_CLOSE = "Close",
     SETTINGS_ERRORS_COUNT = "Recorded errors: %d",
+    -- 诊断窗口（#10）
+    DIAG_TITLE = "OpenUI Diagnostics",
+    DIAG_COPY_HINT = "Select the text and press Ctrl+C to copy.",
 }
 OpenUI.Locales.enUS = enUS
 
