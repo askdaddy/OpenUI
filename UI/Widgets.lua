@@ -5,6 +5,7 @@
 local _, ns = ...
 local OpenUI = ns.OpenUI
 local Theme = OpenUI.Theme
+local L = OpenUI.L
 
 local Widgets = {}
 local instances = {}
@@ -25,10 +26,10 @@ local function panelApply(self)
         get("opacity.panel", self.moduleName))
 end
 
--- Panel(parent, { module = ?, }) -> Frame（背景=surface-container × opacity.panel）
+-- Panel(parent, { module = ?, name = ? }) -> Frame（背景=surface-container × opacity.panel）
 function Widgets.Panel(parent, opts)
     opts = opts or {}
-    local frame = CreateFrame("Frame", nil, parent)
+    local frame = CreateFrame("Frame", opts.name, parent)
     local bg = frame:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(frame)
     local inst = { bg = bg, moduleName = opts.module, apply = panelApply }
@@ -93,6 +94,7 @@ function Widgets.Button(parent, label, opts)
         inst.stateAlpha = 0
         inst:apply()
     end
+    button.themedLabel = fs
     return button
 end
 
@@ -118,6 +120,60 @@ function Widgets.Refresh()
     for i = 1, #instances do
         instances[i]:apply()
     end
+end
+
+-- Toggle(parent, label, getState, setState, { module = ? }) -> Button
+-- 开/关两态控件（#8）：点击切换，文本随 L 即时刷新。
+function Widgets.Toggle(parent, label, getState, setState, opts)
+    opts = opts or {}
+    local button = CreateFrame("Button", nil, parent)
+    local bg = button:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(button)
+    local overlay = button:CreateTexture(nil, "ARTWORK")
+    overlay:SetAllPoints(button)
+    local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local inst = {
+        bg = bg, overlay = overlay, label = fs, moduleName = opts.module,
+        stateAlpha = 0, disabled = false, apply = buttonApply,
+        labelText = label, getState = getState, setState = setState,
+    }
+    function inst:refreshText()
+        local state = self.getState and self.getState() and true or false
+        self.label:SetText((L[self.labelText] or self.labelText)
+            .. ": " .. (state and L.SETTINGS_ON or L.SETTINGS_OFF))
+    end
+    local applyBase = inst.apply
+    inst.apply = function(self)
+        applyBase(self)
+        inst:refreshText()
+    end
+    button:SetScript("OnEnter", function()
+        if inst.disabled then return end
+        inst.stateAlpha = get("state.hover", inst.moduleName)
+        inst:apply()
+    end)
+    button:SetScript("OnLeave", function()
+        inst.stateAlpha = 0
+        inst:apply()
+    end)
+    button:SetScript("OnMouseDown", function()
+        if inst.disabled then return end
+        inst.stateAlpha = get("state.pressed", inst.moduleName)
+        inst:apply()
+    end)
+    button:SetScript("OnMouseUp", function()
+        if inst.disabled then return end
+        inst.stateAlpha = get("state.hover", inst.moduleName)
+        inst:apply()
+    end)
+    button:SetScript("OnClick", function()
+        if inst.setState then inst.setState(not (inst.getState and inst.getState())) end
+        inst:apply()
+    end)
+    instances[#instances + 1] = inst
+    inst:apply()
+    button.themedLabel = fs
+    return button
 end
 
 OpenUI.Widgets = Widgets

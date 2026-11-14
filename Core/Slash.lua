@@ -30,4 +30,6 @@ SlashCmdList["OPENUI"] = function(msg)
     end
     print(L.VERSION_LINE:format(OpenUI.version))
     print(L.MODULES_LINE:format(moduleList()))
+    -- #8 Q2：追加打开设置窗口（Settings 未加载时零影响）
+    if OpenUI.Settings then OpenUI.Settings.Open() end
 end
