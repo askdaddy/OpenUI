@@ -122,9 +122,13 @@ function OpenUI:EnableModule(name)
     setEnabled(name, true)
     if not initialized[name] then
         initialized[name] = true
-        Run(name .. "/OnInitialize", module.OnInitialize, module)
+        if type(module.OnInitialize) == "function" then
+            Run(name .. "/OnInitialize", module.OnInitialize, module)
+        end
     end
-    Run(name .. "/OnEnable", module.OnEnable, module)
+    if type(module.OnEnable) == "function" then
+        Run(name .. "/OnEnable", module.OnEnable, module)
+    end
     return true
 end
 
@@ -141,7 +145,9 @@ function OpenUI:DisableModule(name)
     end
     setEnabled(name, false)
     if OpenUI.Release then OpenUI.Release(name) end -- 先释放资源，再回调（#6 design 边界 7）
-    Run(name .. "/OnDisable", module.OnDisable, module)
+    if type(module.OnDisable) == "function" then
+        Run(name .. "/OnDisable", module.OnDisable, module)
+    end
     return true
 end
 
