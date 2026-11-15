@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 单位框体 T1（B1，默认关闭）：玩家/目标框体（名称、职业色/反应色生命条+数值、能量条，Unit* API 全守卫）；新增共享原生帧隐藏助手 `OpenUI.Native`（按模块记账、脱战应用、恢复幂等，B1 各票复用）；隐藏原生 PlayerFrame/TargetFrame，关闭恢复；队友/焦点/ToT/宠物分期保持原生（#13）。
 - 聊天 T1：主题化原生聊天框架外观——全部 ChatFrame 与输入框背景（surface × opacity.panel）、边框（outline-variant）、字号（type.body，保留原字体文件）；配色切换即时联动（Theme rebuild 钩子）、PLAYER_ENTERING_WORLD 重应用；关闭模块逐项恢复启用前原值；不重建聊天引擎（消息/超链接/右键/标签交互原生保留）；自定义标签视觉/停靠/战斗日志/频道增强分期（#12）。
 - 动作条 T1：主条 12 个安全按钮（SecureActionButtonTemplate；分页 1–6 经 SecureHandlerStateTemplate 安全状态驱动，含 bonusbar 形态页）、宠物条 10 安全按钮；主题化底/图标/数量显示；原生主条与宠物条仅脱战隐藏（战斗中经 PLAYER_REGEN_ENABLED 延后），关闭模块恢复原生；多动作条/姿态/载具/额外动作保持原生（后续分期）（#11）。
 - 诊断增强：`/openui errors` 保留聊天输出并额外打开**可复制堆栈查看窗口**（多行 EditBox，编号条目含完整 debugstack，选中 Ctrl+C 复制；空队列显示无错误提示；单实例、拖拽/ESC 关闭、`Diagnostics` 模块默认启用）；错误队列维持 50 条 FIFO 上限且**不跨会话保留**（运行数据不入档、不写 SavedVariables）（#10）。
