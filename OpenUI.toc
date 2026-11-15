@@ -29,6 +29,7 @@ UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
 UI\SpecialUI.lua
+UI\Media.lua
 UI\SystemUI.lua
 UI\AuctionUI.lua
 UI\ProfUI.lua
