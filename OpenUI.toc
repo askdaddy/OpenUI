@@ -24,3 +24,4 @@ UI\Chat.lua
 UI\Native.lua
 UI\UnitFrames.lua
 UI\CastBars.lua
+UI\Auras.lua
