@@ -28,6 +28,7 @@ UI\Auras.lua
 UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
+UI\SystemUI.lua
 UI\AuctionUI.lua
 UI\ProfUI.lua
 UI\TradeUI.lua
