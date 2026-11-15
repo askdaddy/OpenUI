@@ -37,6 +37,7 @@ local zhCN = {
     DIAG_TITLE = "OpenUI 诊断",
     DIAG_COPY_HINT = "选中文本后按 Ctrl+C 复制。",
     MEDIA_INVALID = "无效的媒体注册已忽略：%s",
+    MEDIA_MISSING = "媒体缺失，已回退：%s",
 }
 OpenUI.Locales.zhCN = zhCN
 
