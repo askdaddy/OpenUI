@@ -28,6 +28,7 @@ UI\Auras.lua
 UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
+UI\SocialUI.lua
 UI\PartyUI.lua
 UI\SpellUI.lua
 UI\CharUI.lua
