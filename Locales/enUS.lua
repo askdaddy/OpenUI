@@ -37,6 +37,7 @@ local enUS = {
     DIAG_TITLE = "OpenUI Diagnostics",
     DIAG_COPY_HINT = "Select the text and press Ctrl+C to copy.",
     MEDIA_INVALID = "Invalid media registration ignored: %s",
+    MEDIA_MISSING = "Media not found, falling back: %s",
 }
 OpenUI.Locales.enUS = enUS
 

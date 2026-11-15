@@ -81,6 +81,63 @@ end
 
 function Media.IsBridged() return bridged end
 
+-- ==== #43：选择预览数据 / 配置标识化 / 缺失回退 ====
+
+-- 选择器数据：内部 + 外部（去重合并；外部缺失时仅内部）。
+function Media.Options(kind)
+    local seen = {}
+    local list = {}
+    for _, name in ipairs(Media.List(kind)) do
+        if not seen[name] then seen[name] = true; list[#list + 1] = name end
+    end
+    local external = Media.External(kind)
+    if type(external) == "table" then
+        for _, name in ipairs(external) do
+            if not seen[name] then seen[name] = true; list[#list + 1] = name end
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+-- 解析媒体名：internal / external / missing（缺失软报告并回退 fallbackName 的解析结果）。
+function Media.Resolve(kind, name, fallbackName)
+    if Media.Fetch(kind, name) then
+        return { source = "internal", name = name, value = Media.Fetch(kind, name) }
+    end
+    local external = Media.External(kind)
+    if type(external) == "table" then
+        for _, candidate in ipairs(external) do
+            if candidate == name then
+                local lsm = Media._LSM()
+                local value
+                if lsm and type(lsm.Fetch) == "function" then
+                    value = lsm:Fetch(kind, name)
+                end
+                return { source = "external", name = name, value = value }
+            end
+        end
+    end
+    Diagnose.Report("Media", L.MEDIA_MISSING:format(tostring(name)))
+    if fallbackName and fallbackName ~= name then
+        local fallback = Media.Resolve(kind, fallbackName, nil)
+        fallback.fellBack = true
+        return fallback
+    end
+    return { source = "missing", name = name, value = nil }
+end
+
+-- 配置标识化：仅存媒体名字符串（导出串不嵌入素材本体；非法输入拒绝）。
+function Media.SetConfigName(configTable, key, kind, name)
+    if type(configTable) ~= "table" or type(key) ~= "string"
+        or type(name) ~= "string" or name == "" then
+        Diagnose.Report("Media", L.MEDIA_INVALID:format(tostring(name)))
+        return false
+    end
+    configTable[key] = name
+    return true
+end
+
 OpenUI.Media = Media
 
 OpenUI:RegisterModule("Media", {

@@ -1,5 +1,5 @@
 -- 共享测试桩头（B1 批量）：帧/纹理/字体串/C_Timer/时钟
--- OpenUI 媒体黑盒测试（Issue #42 冻结验收，QA 独立编写）。
+-- OpenUI 媒体黑盒测试（Issue #43 冻结验收，QA 独立编写）。
 -- 运行：lua test/openui_media_test.lua
 local HERE = (arg[0]:match("^(.*)[/\\]") or ".")
 local ADDON = HERE .. "/.."
@@ -92,6 +92,27 @@ ck(LSM_STATE.registered["statusbar:OpenUI:Flat"] ~= nil, "internal media registe
 ck(Media.External("statusbar")[1] == "Blizzard", "external includes third-party entries")
 -- 预览/配置标识（#43 前置验证）：值为字符串标识
 ck(type(Media.Fetch("statusbar", "OpenUI:Flat")) == "string", "media value is identifier string")
+
+-- ==== #43 断言 ====
+ck(#Media.Options("statusbar") >= 2, "options merges internal + external")
+local seenOpt = {}
+for _, n in ipairs(Media.Options("statusbar")) do seenOpt[n] = true end
+ck(seenOpt["OpenUI:Flat"] and seenOpt["Blizzard"], "options contains both sources")
+local r1 = Media.Resolve("statusbar", "OpenUI:Flat")
+ck(r1.source == "internal" and r1.value ~= nil, "resolve internal")
+local r2 = Media.Resolve("statusbar", "Blizzard")
+ck(r2.source == "external", "resolve external")
+local nBefore = #OpenUI.Diagnose.Errors()
+local r3 = Media.Resolve("statusbar", "OpenUI:Ghost", "OpenUI:Flat")
+ck(r3.source == "internal" and r3.name == "OpenUI:Flat" and r3.fellBack == true, "missing falls back")
+ck(#OpenUI.Diagnose.Errors() == nBefore + 1, "missing diagnosed once")
+local r4 = Media.Resolve("statusbar", "OpenUI:Ghost")
+ck(r4.source == "missing" and r4.value == nil, "no fallback -> missing")
+local cfg = {}
+ck(Media.SetConfigName(cfg, "statusbar", "statusbar", "OpenUI:Flat") == true and cfg.statusbar == "OpenUI:Flat", "config stores name string only")
+ck(Media.SetConfigName(cfg, "k", "statusbar", 42) == false and cfg.k == nil, "non-string name rejected")
+ck(type(cfg.statusbar) == "string", "export identifier is string (no material embedded)")
+
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then for _, f in ipairs(failures) do io.stderr:write("FAIL: "..f.."\n") end os.exit(1) end
 os.exit(0)
