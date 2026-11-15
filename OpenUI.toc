@@ -28,3 +28,5 @@ UI\Auras.lua
 UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
+UI\Tooltips.lua
+UI\Tooltips.lua
