@@ -232,6 +232,7 @@ local function rebuild()
         colors[name] = resolved[token]
     end
     if OpenUI.Widgets then OpenUI.Widgets.Refresh() end
+    if OpenUI.Chat and OpenUI.Chat.ApplyTheme then OpenUI.Chat.ApplyTheme() end
 end
 
 local Theme = {}

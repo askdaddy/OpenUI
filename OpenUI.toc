@@ -20,3 +20,4 @@ UI\Widgets.lua
 UI\Settings.lua
 UI\Diagnostics.lua
 UI\ActionBars.lua
+UI\Chat.lua
