@@ -233,6 +233,7 @@ local function rebuild()
     end
     if OpenUI.Widgets then OpenUI.Widgets.Refresh() end
     if OpenUI.Chat and OpenUI.Chat.ApplyTheme then OpenUI.Chat.ApplyTheme() end
+    if OpenUI.Restyle and OpenUI.Restyle.RefreshAll then OpenUI.Restyle.RefreshAll() end
 end
 
 local Theme = {}

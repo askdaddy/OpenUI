@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 小地图 T1（B1，默认关闭）：主题化边框环（outline-variant 描边锚定原生 Minimap，功能全保留）+ 坐标文本（GetPlayerMapPosition 百分比、1s 刷新、无定位清空）；**新增共享外观重绘助手 `OpenUI.Restyle`**（命名原生帧主题背景/边框/字号 + 原值恢复 + 配色切换刷新，B1 后续界面票复用）（#17）。
 - 名牌 T1（B1，默认关闭）：经 NAME_PLATE_CREATED/UNIT_ADDED 事件对名牌应用主题（反应色血条、名称字号 type.label）；结构不可识别零操作零报错（守卫）；不触碰锚点/缩放/点击；关闭停止应用（已应用保持到刷新，已知限制）；连击点/资源/仇恨增强分期（#16）。
 - 光环 T1（B1，默认关闭）：玩家 Buff/Debuff 两行图标（图标/层数/剩余时间分钟-秒自适应、Buff outline 描边/Debuff error 描边、无持续时间留空）；UNIT_AURA 事件重算 + 0.5s 定时刷新剩余；无光环整行隐藏；原生 BuffFrame（含临时附魔区）经 OpenUI.Native 隐藏、关闭恢复；目标光环/过滤排序/点击取消分期（#15）。
 - 施法条 T1（B1，默认关闭）：玩家/目标施法条（法术名、primary 进度条、剩余秒；引导法术反向进度并标注）；施法事件即时重算 + 0.1s 定时推进（战斗信息及时）；无施法隐藏；原生 CastingBarFrame/TargetFrameSpellBar 经 OpenUI.Native 隐藏、关闭恢复；焦点/宠物施法条分期（#14）。
