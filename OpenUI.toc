@@ -28,6 +28,8 @@ UI\Auras.lua
 UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
+UI\QuestUI.lua
+UI\QuestUI.lua
 UI\WorldMapUI.lua
 UI\Bags.lua
 UI\Tooltips.lua
