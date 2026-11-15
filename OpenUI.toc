@@ -28,6 +28,7 @@ UI\Auras.lua
 UI\Nameplates.lua
 UI\Restyle.lua
 UI\MinimapUI.lua
+UI\SpellUI.lua
 UI\CharUI.lua
 UI\NPCUI.lua
 UI\QuestUI.lua
