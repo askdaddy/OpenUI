@@ -37,6 +37,7 @@ end
 local frames = {}
 local function mktex()
     local t = {}
+    function t:SetPoint() end
     function t:SetAllPoints() end
     function t:SetColorTexture(r, g, b, a) self.r, self.g, self.b, self.a = r, g, b, a end
     function t:SetAlpha(a) self.alpha = a end
@@ -44,6 +45,7 @@ local function mktex()
 end
 local function mkfs()
     local f = {}
+    function f:SetPoint() end
     function f:SetText(s) self.text = s end
     function f:SetTextColor(r, g, b, a) self.tr, self.tg, self.tb, self.ta = r, g, b, a end
     function f:SetAlpha(a) self.fa = a end

@@ -37,6 +37,7 @@ end
 local frames = {}
 local function mktex()
     local t = {}
+    function t:SetPoint() end
     function t:SetAllPoints() end
     function t:SetColorTexture(r, g, b, a) self.r, self.g, self.b, self.a = r, g, b, a end
     function t:SetAlpha(a) self.alpha = a end
