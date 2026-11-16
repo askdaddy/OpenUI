@@ -25,6 +25,7 @@ function GetRealmName() return "Forever" end
 local frames = {}
 local function mktex()
     local t = {}
+    function t:SetPoint() end
     function t:SetAllPoints() end
     function t:SetColorTexture() end
     function t:SetAlpha() end
