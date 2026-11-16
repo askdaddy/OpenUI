@@ -114,11 +114,11 @@ local L = OpenUI.L
 
 _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 local panel = Widgets.Panel(UIParent)
-local border = Theme.Get("color.outline-variant")
+local border = Theme.Get("color.outline")
 local edges = 0
 local sheen
 for _, tex in ipairs(panel.textures) do
-    if tex.r == border[1] and tex.g == border[2] and tex.a == 0.9 then edges = edges + 1 end
+    if tex.r == border[1] and tex.g == border[2] and tex.a == 0.95 then edges = edges + 1 end
     if tex.gradient then sheen = tex end
 end
 check(edges == 4, "Panel 四边 1px 边框（outline-variant ×0.9，实际 " .. edges .. "）")
@@ -128,15 +128,15 @@ check(sheen ~= nil and math.abs(sheen.gradient.c1.a - 0.35) < 1e-9
 local button = Widgets.Button(UIParent, "OK")
 local btnEdges = 0
 for _, tex in ipairs(button.textures) do
-    if tex.r == border[1] and tex.a == 0.75 then btnEdges = btnEdges + 1 end
+    if tex.r == border[1] and tex.a == 0.8 then btnEdges = btnEdges + 1 end
 end
 check(btnEdges == 4, "Button 四边细边框（×0.75，实际 " .. btnEdges .. "）")
 -- 配色联动
 Theme.SetPalette("moss")
-local newBorder = Theme.Get("color.outline-variant")
+local newBorder = Theme.Get("color.outline")
 local updated = 0
 for _, tex in ipairs(panel.textures) do
-    if tex.r == newBorder[1] and tex.g == newBorder[2] and tex.a == 0.9 then updated = updated + 1 end
+    if tex.r == newBorder[1] and tex.g == newBorder[2] and tex.a == 0.95 then updated = updated + 1 end
 end
 check(updated == 4, "换配色后边框随 Refresh 换色")
 -- 缺失 API 降级

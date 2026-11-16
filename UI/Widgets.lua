@@ -130,8 +130,8 @@ end
 local decorated = {}
 
 local function decorate(frame, kind)
-    local border = Theme.Get("color.outline-variant")
-    local alpha = kind == "panel" and 0.9 or 0.75
+    local border = Theme.Get("color.outline")
+    local alpha = kind == "panel" and 0.95 or 0.8
     applyBackdropBorder(frame, border, alpha)
     local edges = {
         edgeTexture(frame, 0, 0, 0, -1, border, alpha),   -- 上
@@ -159,7 +159,18 @@ local function decorate(frame, kind)
             end
         end
     end
-    decorated[#decorated + 1] = { frame = frame, edges = edges, sheen = sheen, kind = kind }
+    local band
+    if kind == "panel" and type(frame.CreateTexture) == "function" then
+        band = frame:CreateTexture(nil, "ARTWORK")
+        band:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+        band:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+        if type(band.SetHeight) == "function" then band:SetHeight(28) end
+        local top = Theme.Get("color.surface-container-highest")
+        if type(band.SetColorTexture) == "function" then
+            band:SetColorTexture(top[1], top[2], top[3], 0.10)
+        end
+    end
+    decorated[#decorated + 1] = { frame = frame, edges = edges, sheen = sheen, band = band, kind = kind }
 end
 
 
@@ -266,6 +277,12 @@ end
 -- Text(parent, text, role?) -> FontString（role 默认 body；file=nil 时继承创建模板字体）
 function Widgets.Text(parent, text, role)
     local fontString = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    if type(fontString.SetShadowOffset) == "function" then
+        fontString:SetShadowOffset(1, -1)
+        if type(fontString.SetShadowColor) == "function" then
+            fontString:SetShadowColor(0, 0, 0, 0.9)
+        end
+    end
     fontString:SetText(text or "")
     local inst = { fontString = fontString, role = role or "body", apply = textApply }
     instances[#instances + 1] = inst
@@ -278,11 +295,11 @@ function Widgets.Refresh()
     for i = 1, #instances do
         instances[i]:apply()
     end
-    local border = Theme.Get("color.outline-variant")
+    local border = Theme.Get("color.outline")
     local top = Theme.Get("color.surface-container-highest")
     for i = 1, #decorated do
         local d = decorated[i]
-        local alpha = d.kind == "panel" and 0.9 or 0.7
+        local alpha = d.kind == "panel" and 0.95 or 0.8
         if d.frame and type(d.frame.SetBackdropBorderColor) == "function" and HAS_BACKDROP then
             d.frame:SetBackdropBorderColor(border[1], border[2], border[3], alpha)
         end
@@ -290,6 +307,9 @@ function Widgets.Refresh()
             if type(edge.SetColorTexture) == "function" then
                 edge:SetColorTexture(border[1], border[2], border[3], alpha)
             end
+        end
+        if d.band and type(d.band.SetColorTexture) == "function" then
+            d.band:SetColorTexture(top[1], top[2], top[3], 0.10)
         end
         if d.sheen and d.sheen.gradientFallback and type(d.sheen.SetColorTexture) == "function" then
             d.sheen:SetColorTexture(top[1], top[2], top[3], 0.18)
