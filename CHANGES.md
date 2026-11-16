@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- **根因修复3（#69）**：`edgeTexture` 下边框锚点错误（TOPLEFT(0,1)+BOTTOMRIGHT(0,0)）生成的是**覆盖整框的薄膜**（0.408 灰×0.95），这是"面板浅灰、文字变暗"系列现象的真正原因（probe v5 A/B 差分确证）。新增 `Widgets.Edge(frame, side, color, alpha)`（每边两点锚定+SetHeight/SetWidth(1)），Widgets 四边、动作按钮四边、单位框体条描边、施法条描边全部替换。（#69）
 - 诊断增强（#68）：probe v5——Widgets.Panel vs ForeverUI 裸克隆配方并排（A/B）、裸 FontString vs Widgets.Text（C）、带/不带阴影（D），一次截图定位"深底变白/亮字变黑"的触发层。（#68）
 - **根因修复2（#67，对照 examples/ForeverUI 配方）**：该客户端上**子层级 0 的填充纹理渲染为白色**（下发的颜色值正确、裸 ARTWORK 色块正常）。按 ForeverUI 的配方统一：全部填充 `CreateTexture(nil, "BACKGROUND", nil, -8)`（面板/按钮/条轨/搜索框底），全部描边 `CreateTexture(nil, "OVERLAY", nil, 7)`（四边/动作按钮/条描边/光环）；网格线保持 ARTWORK。（#67）
 - 诊断增强（#66）：probe v4——五图层着色矩阵（BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY 同红色对照，独立裸帧避免面板干扰）+ surface 色 ARTWORK 对照组，一次截图确定客户端可用图层。（#66）

@@ -98,11 +98,15 @@ local function buildUnit(point, name)
     bar:SetSize(0, BAR_HEIGHT)
     local text = Widgets.Text(frame, "", "label")
     text:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -16)
-    -- #56：进度条 1px 暗描边
-    local barEdge = frame:CreateTexture(nil, "OVERLAY", nil, 7)
-    barEdge:SetColorTexture(0, 0, 0, 0.7)
-    barEdge:SetPoint("TOPLEFT", track, "TOPLEFT", -1, 1)
-    barEdge:SetPoint("BOTTOMRIGHT", track, "BOTTOMRIGHT", 1, -1)
+    -- #56/#69：进度条 1px 暗描边（四边正确边线）
+    local barEdge = {}
+    if OpenUI.Widgets and OpenUI.Widgets.Edge then
+        local dark = { 0, 0, 0 }
+        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+            local t = OpenUI.Widgets.Edge(track, side, dark, 0.7)
+            if t then barEdge[#barEdge + 1] = t end
+        end
+    end
     return { frame = frame, name = label, track = track, bar = bar, text = text, barEdge = barEdge, shownCast = false }
 end
 
