@@ -25,6 +25,10 @@ SlashCmdList["OPENUI"] = function(msg)
         if S and S.IsOpen then
             print("settings open=" .. tostring(S.IsOpen()))
         end
+        if OpenUI.Native and OpenUI.Native.Snapshot then
+            local snapshot = OpenUI.Native.Snapshot()
+            print("native hiding (" .. #snapshot .. "): " .. table.concat(snapshot, " | "))
+        end
         if OpenUI.ActionBars then
             local bar = OpenUI.ActionBars.MainBar()
             local buttons = OpenUI.ActionBars.MainButtons()

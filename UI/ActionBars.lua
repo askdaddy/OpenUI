@@ -25,11 +25,10 @@ local BAR_DEFS = {
 
 local ActionBars = {}
 local bars = {} -- key -> { frame, buttons = {}, def }
-local petBar, nativeHider
+local petBar
 local petButtons = {}
 local built = false
 local eventsRegistered = false
-local pendingNativeHide = false
 
 local NATIVE_BARS = {
     "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
@@ -284,36 +283,6 @@ local function applyBarVisibility()
     end
 end
 
-local function hideNative()
-    if not nativeHider then
-        nativeHider = CreateFrame("Frame", "OpenUINativeHider", UIParent)
-        nativeHider:Hide()
-    end
-    if not OpenUI:CanModifyNow() then
-        pendingNativeHide = true
-        return
-    end
-    pendingNativeHide = false
-    for _, name in ipairs(NATIVE_BARS) do
-        local bar = _G[name]
-        if bar then
-            bar.openuiOriginalParent = bar.openuiOriginalParent or bar:GetParent()
-            bar:SetParent(nativeHider)
-            if bar.Hide then bar:Hide() end
-        end
-    end
-end
-
-local function restoreNative()
-    for _, name in ipairs(NATIVE_BARS) do
-        local bar = _G[name]
-        if bar then
-            bar:SetParent(bar.openuiOriginalParent or UIParent)
-            bar.openuiOriginalParent = nil
-            if bar.Show then bar:Show() end
-        end
-    end
-end
 
 local function registerEvents()
     if eventsRegistered then return end
@@ -324,9 +293,7 @@ local function registerEvents()
     own:On("ACTIONBAR_UPDATE_STATE", refreshAll)
     own:On("ACTIONBAR_PAGE_CHANGED", refreshAll)
     own:On("PET_BAR_UPDATE", refreshPetIcons)
-    own:On("PLAYER_REGEN_ENABLED", function()
-        if pendingNativeHide then hideNative() end
-    end)
+
 end
 
 -- 设置面板模块小窗：各 bar 显示开关（#47）
@@ -370,7 +337,7 @@ function ActionBars.OnEnable()
     applyBarVisibility()
     if petBar then petBar:Show() end
     refreshAll()
-    hideNative()
+    OpenUI.Native.Hide("ActionBars", NATIVE_BARS)
 end
 
 function ActionBars.OnDisable()
@@ -381,7 +348,7 @@ function ActionBars.OnDisable()
         if bar then bar.frame:Hide() end
     end
     if petBar then petBar:Hide() end
-    restoreNative()
+    OpenUI.Native.Restore("ActionBars")
 end
 
 -- 兼容 API（#11 测试与消费者）
