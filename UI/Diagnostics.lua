@@ -5,6 +5,7 @@
 local _, ns = ...
 local OpenUI = ns.OpenUI
 local L = OpenUI.L
+local Theme = OpenUI.Theme
 local Widgets = OpenUI.Widgets
 
 local Diagnostics = {}
