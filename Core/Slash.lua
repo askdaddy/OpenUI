@@ -45,7 +45,7 @@ SlashCmdList["OPENUI"] = function(msg)
         if S and S.IsOpen then
             print("settings open=" .. tostring(S.IsOpen()))
         end
-        if OpenUI.Theme then
+        local function printThemeLine()
             local surf = OpenUI.Theme.Get("color.surface")
             local onSurf = OpenUI.Theme.Get("color.on-surface")
             local outline = OpenUI.Theme.Get("color.outline")
@@ -54,7 +54,27 @@ SlashCmdList["OPENUI"] = function(msg)
                     surf and surf[1] or -1, surf and surf[2] or -1, surf and surf[3] or -1,
                     onSurf and onSurf[1] or -1, outline and outline[1] or -1,
                     OpenUI.Theme.Get("opacity.panel") or -1))
+            -- #60：打印 OpenUIDB.theme 全部键值（检测旧/异常定制）
+            local theme = _G.OpenUIDB and _G.OpenUIDB.theme
+            if type(theme) == "table" then
+                local parts = {}
+                for key, value in pairs(theme) do
+                    local text
+                    if type(value) == "table" then
+                        text = ("{%.3f,%.3f,%.3f,%.3f}"):format(
+                            value[1] or -1, value[2] or -1, value[3] or -1, value[4] or -1)
+                    else
+                        text = tostring(value)
+                    end
+                    parts[#parts + 1] = key .. "=" .. text
+                end
+                table.sort(parts)
+                print("theme-db: " .. (#parts > 0 and table.concat(parts, " ") or "(empty)"))
+            else
+                print("theme-db: (nil)")
+            end
         end
+        printThemeLine()
         if OpenUI.Widgets and OpenUI.Widgets.DebugInfo then
             print(OpenUI.Widgets.DebugInfo())
         end
@@ -73,6 +93,19 @@ SlashCmdList["OPENUI"] = function(msg)
             if red.SetTexture then green:SetTexture("Interface\\Buttons\\WHITE8X8") end
             if type(green.SetVertexColor) == "function" then green:SetVertexColor(0, 1, 0, 1) end
             swatch:Show()
+            -- #60：真实 Panel 管线样块（surface-container 底 + on-surface 文字 + outline 边框）
+            local probePanel = OpenUI.Widgets and OpenUI.Widgets.Panel(UIParent)
+            if probePanel then
+                probePanel:SetSize(220, 46)
+                probePanel:SetPoint("CENTER", UIParent, "CENTER", 0, -210)
+                local probeLabel = OpenUI.Widgets.Text(probePanel, "panel sample", "body")
+                probeLabel:SetPoint("CENTER", probePanel, "CENTER", 0, 0)
+                if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                    C_Timer.After(10, function() probePanel:Hide() end)
+                end
+            end
+            -- 结尾重复主题行，避免聊天滚动
+            printThemeLine()
             if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
                 C_Timer.After(10, function() swatch:Hide() end)
             end
