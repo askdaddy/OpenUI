@@ -9,6 +9,7 @@ local L = OpenUI.L
 
 local Widgets = {}
 local instances = {}
+local movers = {}
 
 -- ==== 装饰（#48）：1px 细边框 + 顶部渐亮 sheen + 半透明底 ====
 local function activeConfig()
@@ -24,12 +25,14 @@ end
 -- section/key 为配置节点；point 为缺省锚点（可选，nil 表示不重锚）。
 function Widgets.MakeDraggable(frame, section, key, point)
     if type(frame) ~= "table" then return end
+    movers[#movers + 1] = { frame = frame, section = section, key = key }
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
         local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
-        if alt and OpenUI:CanModifyNow() then
+        local editing = OpenUI.EditMode and OpenUI.EditMode.IsActive and OpenUI.EditMode.IsActive()
+        if (alt or editing) and OpenUI:CanModifyNow() then
             self:StartMoving()
             if OpenUI.Grid and type(OpenUI.Grid.NotifyDragStart) == "function" then
                 OpenUI.Grid.NotifyDragStart()
@@ -302,6 +305,10 @@ function Widgets.Toggle(parent, label, getState, setState, opts)
     decorate(button, "button")
     button.themedLabel = fs
     return button
+end
+
+function Widgets.Movers()
+    return movers
 end
 
 OpenUI.Widgets = Widgets

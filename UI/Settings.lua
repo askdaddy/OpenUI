@@ -340,6 +340,21 @@ local function build()
         self:ClearFocus()
     end)
 
+    local editButton = Widgets.Button(frame, L.SETTINGS_EDIT_MODE)
+    editButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 232, -60)
+    editButton:SetSize(140, 24)
+    editButton:SetScript("OnClick", function()
+        if OpenUI.EditMode then
+            OpenUI.EditMode.Toggle()
+            editButton.themedLabel:SetText(
+                (OpenUI.EditMode.IsActive() and "● " or "") .. L.SETTINGS_EDIT_MODE)
+        end
+    end)
+    addLabelRef(editButton.themedLabel, function()
+        local marker = (OpenUI.EditMode and OpenUI.EditMode.IsActive()) and "● " or ""
+        editButton.themedLabel:SetText(marker .. L.SETTINGS_EDIT_MODE)
+    end)
+
     hubHost = CreateFrame("Frame", nil, frame)
     hubHost:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -94)
     hubHost:SetSize(WINDOW_W - 32, WINDOW_H - 112)

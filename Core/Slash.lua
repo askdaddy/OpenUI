@@ -16,6 +16,13 @@ SLASH_OPENUI1 = "/openui"
 
 SlashCmdList["OPENUI"] = function(msg)
     msg = strtrim(msg or ""):lower()
+    if msg == "edit" then
+        if OpenUI.EditMode then
+            local on = OpenUI.EditMode.Toggle()
+            print(L.EDIT_MODE_HINT:format(on and L.SETTINGS_GRID_ON or L.SETTINGS_GRID_OFF))
+        end
+        return
+    end
     if msg:match("^grid") then
         if OpenUI.Grid then
             local size = tonumber(msg:match("^grid%s+(%d+)$"))
