@@ -111,32 +111,34 @@ SlashCmdList["OPENUI"] = function(msg)
                 local infoText = OpenUI.Widgets.Text(probePanel, info, "label")
                 infoText:SetPoint("TOPLEFT", probePanel, "TOPLEFT", 10, -8)
 
-                -- 四条对照条
-                local function strip(x, label, painter)
-                    local tex = probePanel:CreateTexture(nil, "ARTWORK")
-                    tex:SetPoint("TOPLEFT", probePanel, "TOPLEFT", x, -40)
-                    tex:SetSize(120, 44)
-                    painter(tex)
-                    local caption = OpenUI.Widgets.Text(probePanel, label, "label")
-                    caption:SetPoint("TOP", tex, "BOTTOM", 0, -4)
+                -- #66：五图层着色矩阵（同色红 1,0,0,1 × 五层；独立裸 Frame，避免面板干扰）
+                local matrix = CreateFrame("Frame", "OpenUIProbeLayers", UIParent)
+                matrix:SetSize(640, 70)
+                matrix:SetPoint("CENTER", UIParent, "CENTER", 0, -290)
+                local layers = { "BACKGROUND", "BORDER", "ARTWORK", "HIGHLIGHT", "OVERLAY" }
+                for index, layerName in ipairs(layers) do
+                    local tex = matrix:CreateTexture(nil, layerName)
+                    tex:SetPoint("TOPLEFT", matrix, "TOPLEFT", (index - 1) * 128, 0)
+                    tex:SetSize(90, 40)
+                    tex:SetColorTexture(1, 0, 0, 1)
+                    local caption = OpenUI.Widgets.Text(matrix, layerName, "label")
+                    caption:SetPoint("TOP", tex, "BOTTOM", 0, -2)
                 end
-                strip(10, "alpha1", function(tex)
-                    if surface then tex:SetColorTexture(surface[1], surface[2], surface[3], 1) end
-                end)
-                strip(150, "a088", function(tex)
-                    if surface then tex:SetColorTexture(surface[1], surface[2], surface[3], 0.88) end
-                end)
-                strip(290, "vtx", function(tex)
-                    if surface and type(tex.SetTexture) == "function" then
-                        tex:SetTexture("Interface\\Buttons\\WHITE8X8")
-                        if type(tex.SetVertexColor) == "function" then
-                            tex:SetVertexColor(surface[1], surface[2], surface[3], 1)
-                        end
-                    end
-                end)
-                strip(430, "ref05", function(tex)
-                    tex:SetColorTexture(0.5, 0.5, 0.5, 1)
-                end)
+                matrix:Show()
+                -- 对照组：surface 色 × ARTWORK（独立帧，验证非红色行为）
+                local control = CreateFrame("Frame", "OpenUIProbeControl", UIParent)
+                control:SetSize(90, 40)
+                control:SetPoint("LEFT", matrix, "RIGHT", 10, 12)
+                local controlTex = control:CreateTexture(nil, "ARTWORK")
+                controlTex:SetAllPoints(control)
+                if surface then
+                    controlTex:SetColorTexture(surface[1], surface[2], surface[3], 1)
+                end
+                control:Show()
+                if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                    C_Timer.After(20, function() matrix:Hide(); control:Hide() end)
+                end
+                print("layers: BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY all painted red")
 
                 -- 主条帧名扫描
                 local candidates = {}
