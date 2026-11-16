@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 诊断增强（#68）：probe v5——Widgets.Panel vs ForeverUI 裸克隆配方并排（A/B）、裸 FontString vs Widgets.Text（C）、带/不带阴影（D），一次截图定位"深底变白/亮字变黑"的触发层。（#68）
 - **根因修复2（#67，对照 examples/ForeverUI 配方）**：该客户端上**子层级 0 的填充纹理渲染为白色**（下发的颜色值正确、裸 ARTWORK 色块正常）。按 ForeverUI 的配方统一：全部填充 `CreateTexture(nil, "BACKGROUND", nil, -8)`（面板/按钮/条轨/搜索框底），全部描边 `CreateTexture(nil, "OVERLAY", nil, 7)`（四边/动作按钮/条描边/光环）；网格线保持 ARTWORK。（#67）
 - 诊断增强（#66）：probe v4——五图层着色矩阵（BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY 同红色对照，独立裸帧避免面板干扰）+ surface 色 ARTWORK 对照组，一次截图确定客户端可用图层。（#66）
 - **根因修复（#65）：Forever 客户端 BACKGROUND 纹理层渲染为白色**（probe v3 四对照条确证：ARTWORK 正常、BACKGROUND 全白）。全部填充纹理（面板/按钮/条轨/网格线/搜索框/光环底）由 BACKGROUND 迁移至 **ARTWORK**（按创建序保持层级）；描边统一 **OVERLAY**（填充之上）；probe 主条扫描改为仅 Frame 对象、每行一条。（#65）
