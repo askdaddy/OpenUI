@@ -153,6 +153,18 @@ local function buildMainBar()
         button:RegisterForClicks("AnyUp")
         button:SetAttribute("type", "action")
         button:SetAttribute("action", i)
+        -- Alt+左键拖拽：从任意按钮也能移动整条（脱战；避免与施法点击冲突）
+        if type(button.RegisterForDrag) == "function" then
+            button:RegisterForDrag("LeftButton")
+            button:SetScript("OnDragStart", function()
+                local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
+                if alt and OpenUI:CanModifyNow() then mainBar:StartMoving() end
+            end)
+            button:SetScript("OnDragStop", function()
+                mainBar:StopMovingOrSizing()
+                savePosition()
+            end)
+        end
         skinButton(button)
         mainBar:SetFrameRef("button" .. i, button)
         mainButtons[i] = button

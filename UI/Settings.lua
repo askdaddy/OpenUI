@@ -252,6 +252,16 @@ local function build()
     searchBox:SetText("")
     searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -64)
     searchBox:SetSize(140, 20)
+    if type(searchBox.SetFontObject) == "function" and type(GameFontHighlight) == "table" then
+        searchBox:SetFontObject(GameFontHighlight)
+    end
+    local textColor = Theme.Get("color.on-surface")
+    if type(searchBox.SetTextColor) == "function" and type(textColor) == "table" then
+        searchBox:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
+    end
+    if type(searchBox.SetTextInsets) == "function" then
+        searchBox:SetTextInsets(6, 6, 0, 0)
+    end
     local searchBg = frame:CreateTexture(nil, "BACKGROUND")
     searchBg:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -2, 2)
     searchBg:SetPoint("BOTTOMRIGHT", searchBox, "BOTTOMRIGHT", 2, -2)
