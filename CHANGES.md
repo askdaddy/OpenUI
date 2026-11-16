@@ -6,7 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
-- **Secret Values 兼容（Forever 客户端实测能力）**：UnitHealth/CastingInfo/Aura/动作数量等返回值可能为秘密值，受污染执行中算术与格式化会抛错——新增  共享助手，UnitFrames/CastBars/Auras/ActionBars/Nameplates/MinimapUI 全部数值/格式化路径降级保护（不可用时显示空文本/静态条/隐藏槽，不中断模块）（验收修复）。
+- **Secret Values 兼容（Forever 客户端实测能力）**：UnitHealth/CastingInfo/Aura/动作数量等返回值可能为秘密值，受污染执行中算术与格式化会抛错——新增 OpenUI.Try 共享助手，UnitFrames/CastBars/Auras/ActionBars/Nameplates/MinimapUI 全部数值/格式化路径降级保护（不可用时显示空文本/静态条/隐藏槽，不中断模块）（验收修复）。
 - 验收修复六：诊断窗口 EditBox 点击聚焦（此前无法拖选/Ctrl+C 复制），Esc 取消聚焦（#10 验收修复）。
 - 验收修复五：诊断窗口多行 EditBox 补字体对象与文字颜色（此前窗口空白、聊天输出正常）；搜索框同类问题一并依赖同一修复路径（#10 验收修复）。
 - 验收修复四：小地图边框由整块方框描边改为**圆形点环**（36 段沿圆周、支持 SetRotation 则细化为切线方向；方框在圆形小地图上会显示为"小方块"）（#17 验收修复）。
