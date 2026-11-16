@@ -78,6 +78,8 @@ local zhCN = {
     SETTINGS_GRID_SIZE_FMT = "网格尺寸：%d",
     SETTINGS_GRID_HINT = "Alt+左键拖动元素；网格显示时位置自动吸附对齐。",
     GRID_TOGGLE_HINT = "布局网格：%s",
+    SETTINGS_EDIT_MODE = "布局编辑",
+    EDIT_MODE_HINT = "布局编辑模式：%s",
     SETTINGS_GRID_ON = "开",
     SETTINGS_GRID_OFF = "关",
     -- 诊断窗口（#10）

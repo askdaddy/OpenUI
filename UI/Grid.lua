@@ -13,6 +13,7 @@ local SIZES = { 32, 48, 64 }
 local DEFAULT_SIZE = 48
 local REST_ALPHA = 0.45
 local fadeTarget, fadeTicker
+local editActive = false
 
 local frame
 local segmentList = {}
@@ -178,7 +179,13 @@ end
 
 function Grid.NotifyDragEnd()
     if not Grid.IsShown() then return end
-    fadeTo(REST_ALPHA)
+    fadeTo(editActive and 1 or REST_ALPHA)
+end
+
+function Grid.SetActiveEditing(value)
+    editActive = value and true or false
+    if not frame or not Grid.IsShown() then return end
+    if type(frame.SetAlpha) == "function" then frame:SetAlpha(editActive and 1 or REST_ALPHA) end
 end
 
 function Grid.Show()

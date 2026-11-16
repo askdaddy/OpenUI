@@ -78,6 +78,8 @@ local enUS = {
     SETTINGS_GRID_SIZE_FMT = "Cell size: %d",
     SETTINGS_GRID_HINT = "Alt+Left drag elements; positions snap to the grid while it is shown.",
     GRID_TOGGLE_HINT = "Layout grid: %s",
+    SETTINGS_EDIT_MODE = "Layout Edit",
+    EDIT_MODE_HINT = "Layout edit mode: %s",
     SETTINGS_GRID_ON = "on",
     SETTINGS_GRID_OFF = "off",
     -- 诊断窗口（#10）
