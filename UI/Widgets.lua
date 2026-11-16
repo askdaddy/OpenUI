@@ -11,6 +11,52 @@ local Widgets = {}
 local instances = {}
 local movers = {}
 
+-- #55：BackdropTemplate 探测（ElvUI Toolkit 的 1px Backdrop 边框做法）
+local HAS_BACKDROP = false
+do
+    local ok = pcall(function()
+        return CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    end)
+    HAS_BACKDROP = ok == true
+end
+Widgets.HasBackdrop = function() return HAS_BACKDROP end
+
+local BORDER_TEX = "Interface\\Buttons\\WHITE8X8"
+
+-- #55：垂直渐变填充（上亮下暗；ElvUI gloss 状态条贴图的等价物，纯内置）
+function Widgets.GradientFill(texture, color)
+    if type(texture) ~= "table" or type(color) ~= "table" then return false end
+    if type(texture.SetGradient) ~= "function" or type(CreateColor) ~= "function" then
+        if type(texture.SetColorTexture) == "function" then
+            texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+        end
+        return false
+    end
+    local function shade(mult)
+        return CreateColor(
+            math.min(color[1] * mult, 1),
+            math.min(color[2] * mult, 1),
+            math.min(color[3] * mult, 1),
+            color[4] or 1)
+    end
+    if type(texture.SetColorTexture) == "function" then
+        texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    end
+    texture:SetGradient("VERTICAL", shade(1.35), shade(0.55))
+    return true
+end
+
+local function applyBackdropBorder(frame, color, alpha)
+    if not HAS_BACKDROP or type(frame.SetBackdrop) ~= "function" then return end
+    frame:SetBackdrop({ edgeFile = BORDER_TEX, edgeSize = 1 })
+    if type(frame.SetBackdropColor) == "function" then
+        frame:SetBackdropColor(0, 0, 0, 0)
+    end
+    if color and type(frame.SetBackdropBorderColor) == "function" then
+        frame:SetBackdropBorderColor(color[1], color[2], color[3], alpha)
+    end
+end
+
 -- ==== 装饰（#48）：1px 细边框 + 顶部渐亮 sheen + 半透明底 ====
 local function activeConfig()
     if OpenUI.Profile and OpenUI.Profile.Config then
@@ -85,7 +131,8 @@ local decorated = {}
 
 local function decorate(frame, kind)
     local border = Theme.Get("color.outline-variant")
-    local alpha = kind == "panel" and 0.9 or 0.7
+    local alpha = kind == "panel" and 0.9 or 0.75
+    applyBackdropBorder(frame, border, alpha)
     local edges = {
         edgeTexture(frame, 0, 0, 0, -1, border, alpha),   -- 上
         edgeTexture(frame, 0, 1, 0, 0, border, alpha),    -- 下
@@ -136,7 +183,7 @@ end
 -- Panel(parent, { module = ?, name = ? }) -> Frame（背景=surface-container × opacity.panel）
 function Widgets.Panel(parent, opts)
     opts = opts or {}
-    local frame = CreateFrame("Frame", opts.name, parent)
+    local frame = CreateFrame("Frame", opts.name, parent, HAS_BACKDROP and "BackdropTemplate" or nil)
     local bg = frame:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(frame)
     local inst = { bg = bg, moduleName = opts.module, apply = panelApply }
@@ -164,7 +211,7 @@ end
 -- Button(parent, label, { module = ? }) -> Button（状态层：hover/pressed/disabled）
 function Widgets.Button(parent, label, opts)
     opts = opts or {}
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame("Button", nil, parent, HAS_BACKDROP and "BackdropTemplate" or nil)
     local bg = button:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(button)
     local overlay = button:CreateTexture(nil, "ARTWORK")
@@ -236,6 +283,9 @@ function Widgets.Refresh()
     for i = 1, #decorated do
         local d = decorated[i]
         local alpha = d.kind == "panel" and 0.9 or 0.7
+        if d.frame and type(d.frame.SetBackdropBorderColor) == "function" and HAS_BACKDROP then
+            d.frame:SetBackdropBorderColor(border[1], border[2], border[3], alpha)
+        end
         for _, edge in ipairs(d.edges) do
             if type(edge.SetColorTexture) == "function" then
                 edge:SetColorTexture(border[1], border[2], border[3], alpha)
@@ -255,7 +305,7 @@ end
 -- 开/关两态控件（#8）：点击切换，文本随 L 即时刷新。
 function Widgets.Toggle(parent, label, getState, setState, opts)
     opts = opts or {}
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame("Button", nil, parent, HAS_BACKDROP and "BackdropTemplate" or nil)
     local bg = button:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(button)
     local overlay = button:CreateTexture(nil, "ARTWORK")

@@ -55,7 +55,14 @@ end
 
 local function setBar(bar, ratio, color, width, height)
     ratio = math.max(0, math.min(1, ratio or 0))
-    if color then bar:SetColorTexture(color[1], color[2], color[3], 1) end
+    if color then
+        -- #55：上亮下暗渐变填充（ElvUI gloss 等价，纯内置；不可用时降级纯色）
+        if Widgets.GradientFill then
+            Widgets.GradientFill(bar, color)
+        else
+            bar:SetColorTexture(color[1], color[2], color[3], 1)
+        end
+    end
     bar:SetSize((width or 208) * ratio, height or 10)
     bar.openuiRatio = ratio
 end
@@ -173,7 +180,13 @@ function UnitFrames.ApplyTheme()
         if parts.frame then
             paintStatic(parts)
             local primary = Theme.Get("color.primary")
-            if primary then parts.power:SetColorTexture(primary[1], primary[2], primary[3], 1) end
+            if primary then
+                if Widgets.GradientFill then
+                    Widgets.GradientFill(parts.power, primary)
+                else
+                    parts.power:SetColorTexture(primary[1], primary[2], primary[3], 1)
+                end
+            end
         end
     end
 end
