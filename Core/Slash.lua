@@ -142,13 +142,18 @@ SlashCmdList["OPENUI"] = function(msg)
                 local candidates = {}
                 for name, value in pairs(_G) do
                     if type(name) == "string" and type(value) == "table"
-                        and (name:find("MainMenu", 1, true) or name:find("MainBar", 1, true)
-                            or name:find("ActionBar", 1, true)) then
+                        and type(value.IsObjectType) == "function"
+                        and value:IsObjectType("Frame")
+                        and (name:find("MainMenu", 1, true) or name:find("MainBar", 1, true)) then
                         candidates[#candidates + 1] = name
                     end
                 end
                 table.sort(candidates)
-                local scan = "globals: " .. (#candidates > 0 and table.concat(candidates, ", ") or "(none)")
+                local lines = {}
+                for i = 1, math.min(#candidates, 6) do
+                    lines[#lines + 1] = candidates[i]
+                end
+                local scan = "frames: " .. (#lines > 0 and table.concat(lines, " | ") or "(none)")
                 local scanText = OpenUI.Widgets.Text(probePanel, scan, "label")
                 scanText:SetPoint("TOPLEFT", probePanel, "TOPLEFT", 10, -108)
                 scanText:SetWidth(540)

@@ -99,7 +99,7 @@ function Widgets.MakeDraggable(frame, section, key, point)
 end
 
 local function edgeTexture(frame, x1, y1, x2, y2, color, alpha)
-    local t = frame:CreateTexture(nil, "BORDER")
+    local t = frame:CreateTexture(nil, "OVERLAY")
     if type(t.SetColorTexture) == "function" then
         t:SetColorTexture(color[1], color[2], color[3], alpha)
     end
@@ -149,7 +149,7 @@ end
 function Widgets.Panel(parent, opts)
     opts = opts or {}
     local frame = CreateFrame("Frame", opts.name, parent)
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
+    local bg = frame:CreateTexture(nil, "ARTWORK")
     bg:SetAllPoints(frame)
     local inst = { bg = bg, moduleName = opts.module, apply = panelApply }
     instances[#instances + 1] = inst
@@ -177,7 +177,7 @@ end
 function Widgets.Button(parent, label, opts)
     opts = opts or {}
     local button = CreateFrame("Button", nil, parent)
-    local bg = button:CreateTexture(nil, "BACKGROUND")
+    local bg = button:CreateTexture(nil, "ARTWORK")
     bg:SetAllPoints(button)
     local overlay = button:CreateTexture(nil, "ARTWORK")
     overlay:SetAllPoints(button)
@@ -272,7 +272,7 @@ end
 function Widgets.Toggle(parent, label, getState, setState, opts)
     opts = opts or {}
     local button = CreateFrame("Button", nil, parent)
-    local bg = button:CreateTexture(nil, "BACKGROUND")
+    local bg = button:CreateTexture(nil, "ARTWORK")
     bg:SetAllPoints(button)
     local overlay = button:CreateTexture(nil, "ARTWORK")
     overlay:SetAllPoints(button)

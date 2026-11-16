@@ -67,7 +67,7 @@ local function barConfig(key)
 end
 
 local function skinButton(button)
-    local bg = button:CreateTexture(nil, "BACKGROUND")
+    local bg = button:CreateTexture(nil, "ARTWORK")
     bg:SetAllPoints(button)
     local icon = button:CreateTexture(nil, "ARTWORK")
     -- #59：图标填满格子（无内缩），1px 描边绘制在其上方
@@ -83,7 +83,7 @@ local function skinButton(button)
     if border then
         local edges = {}
         local function edge(x1, y1, x2, y2)
-            local tex = button:CreateTexture(nil, "BORDER")
+            local tex = button:CreateTexture(nil, "OVERLAY")
             tex:SetColorTexture(border[1], border[2], border[3], 0.8)
             tex:SetPoint("TOPLEFT", button, "TOPLEFT", x1, y1)
             tex:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", x2, y2)

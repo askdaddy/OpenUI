@@ -122,7 +122,7 @@ function Grid.Rebuild()
     local size = Grid.GetSize()
     local x = 0
     while x <= w do
-        local tex = frame:CreateTexture(nil, "BACKGROUND")
+        local tex = frame:CreateTexture(nil, "ARTWORK")
         local width = math.abs(x - w / 2) < 1 and 2 or 1
         if type(tex.SetSize) == "function" then tex:SetSize(width, h) end
         tex:SetPoint("TOPLEFT", frame, "TOPLEFT", x, 0)
@@ -131,7 +131,7 @@ function Grid.Rebuild()
     end
     local y = 0
     while y <= h do
-        local tex = frame:CreateTexture(nil, "BACKGROUND")
+        local tex = frame:CreateTexture(nil, "ARTWORK")
         local height = math.abs(y - h / 2) < 1 and 2 or 1
         if type(tex.SetSize) == "function" then tex:SetSize(w, height) end
         tex:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -y)
