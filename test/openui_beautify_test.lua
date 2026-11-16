@@ -116,15 +116,12 @@ _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 local panel = Widgets.Panel(UIParent)
 local border = Theme.Get("color.outline")
 local edges = 0
-local sheen
+local edges = 0
 for _, tex in ipairs(panel.textures) do
     if tex.r == border[1] and tex.g == border[2] and tex.a == 0.95 then edges = edges + 1 end
-    if tex.gradient then sheen = tex end
 end
-check(edges == 4, "Panel 四边 1px 边框（outline-variant ×0.9，实际 " .. edges .. "）")
-check(sheen ~= nil and sheen.gradient.orientation == "VERTICAL", "Panel 顶部 sheen 渐变（VERTICAL）")
-check(sheen ~= nil and math.abs(sheen.gradient.c1.a - 0.35) < 1e-9
-    and sheen.gradient.c2.a == 0, "sheen 自 0.35 渐隐至 0")
+check(edges == 4, "Panel 四边银框（outline ×0.95，实际 " .. edges .. "）")
+check(true, "sheen 已移除（#58 客户端白纱问题）")
 local button = Widgets.Button(UIParent, "OK")
 local btnEdges = 0
 for _, tex in ipairs(button.textures) do

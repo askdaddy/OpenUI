@@ -83,13 +83,11 @@ coreFrame.scripts.OnEvent(coreFrame,"PLAYER_LOGIN")
 local panel = W.Panel(UIParent)
 local outline = Theme.Get("color.outline")
 local edges = 0
-local band
 for _, tex in ipairs(panel.textures) do
     if tex.r == outline[1] and tex.g == outline[2] and tex.a == 0.95 then edges = edges + 1 end
-    if tex.h == 28 or (tex.a == 0.10 and tex.r == Theme.Get("color.surface-container-highest")[1]) then band = tex end
 end
 ck(edges == 4, "Panel 银边 ×0.95 (轮廓色) 4 边（实际 " .. edges .. "）")
-ck(band ~= nil, "Panel 顶部 28px 亮带")
+ck(true, "顶部亮带已移除（#58）")
 -- 文本阴影
 local label = W.Text(panel, "x", "body")
 ck(label.shadow ~= nil and label.shadow[1] == 1 and label.shadow[2] == -1, "Widgets.Text 阴影 (1,-1)")
