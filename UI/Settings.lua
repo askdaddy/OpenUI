@@ -322,7 +322,7 @@ local function build()
     if type(searchBox.SetTextInsets) == "function" then
         searchBox:SetTextInsets(6, 6, 0, 0)
     end
-    local searchBg = frame:CreateTexture(nil, "ARTWORK")
+    local searchBg = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
     searchBg:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -2, 2)
     searchBg:SetPoint("BOTTOMRIGHT", searchBox, "BOTTOMRIGHT", 2, -2)
     local sc = Theme.Get("color.surface-container-highest")
