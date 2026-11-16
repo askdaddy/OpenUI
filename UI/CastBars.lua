@@ -21,6 +21,10 @@ local function safe(fn, ...)
     if type(fn) == "function" then return fn(...) end
 end
 
+local function try(fn, fallback)
+    return (OpenUI.Try and OpenUI.Try(fn, fallback)) or fallback
+end
+
 local function castInfo(unit)
     -- 返回 name, startTime, endTime, isChannel（无施法 nil）
     local name, _, _, startTime, endTime = safe(UnitCastingInfo, unit)
@@ -30,7 +34,10 @@ local function castInfo(unit)
         if name then isChannel = true end
     end
     if not name or not startTime or not endTime then return nil end
-    return name, startTime / 1000, endTime / 1000, isChannel
+    -- Secret Values：毫秒→秒换算可能抛错 → 时间未知，仅显示名称
+    local startSec = try(function() return startTime / 1000 end, nil)
+    local endSec = try(function() return endTime / 1000 end, nil)
+    return name, startSec, endSec, isChannel
 end
 
 local function updateUnit(parts, unit)
@@ -44,13 +51,29 @@ local function updateUnit(parts, unit)
     parts.shownCast = true
     parts.frame:Show()
     parts.name:SetText(name .. (isChannel and " (引导)" or ""))
-    local total = math.max(endTime - startTime, 0.001)
-    local elapsed = math.max(0, math.min(now - startTime, total))
-    local ratio = elapsed / total
-    if isChannel then ratio = 1 - ratio end
-    parts.bar:SetSize(BAR_WIDTH * ratio, BAR_HEIGHT)
-    parts.bar.openuiRatio = ratio
-    parts.text:SetText(("%.1fs"):format(endTime - now))
+    if not startTime or not endTime then
+        -- 时间不可用（secret）：静态半条 + 无秒数
+        parts.bar:SetSize(BAR_WIDTH * 0.5, BAR_HEIGHT)
+        parts.bar.openuiRatio = 0.5
+        parts.text:SetText("")
+        return
+    end
+    local progress = try(function()
+        local total = math.max(endTime - startTime, 0.001)
+        local elapsed = math.max(0, math.min(now - startTime, total))
+        local ratio = elapsed / total
+        if isChannel then ratio = 1 - ratio end
+        return ratio
+    end, nil)
+    if not progress then
+        parts.bar:SetSize(BAR_WIDTH * 0.5, BAR_HEIGHT)
+        parts.bar.openuiRatio = 0.5
+        parts.text:SetText("")
+        return
+    end
+    parts.bar:SetSize(BAR_WIDTH * progress, BAR_HEIGHT)
+    parts.bar.openuiRatio = progress
+    parts.text:SetText(try(function() return ("%.1fs"):format(endTime - now) end, ""))
 end
 
 function CastBars.UpdatePlayer() if player.frame then updateUnit(player, "player") end end

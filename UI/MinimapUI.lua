@@ -22,15 +22,18 @@ end
 
 local function updateCoords()
     if not coords then return end
-    local x, y
-    if type(GetPlayerMapPosition) == "function" then
-        x, y = GetPlayerMapPosition("player")
-    end
-    if x and x > 0 then
-        coords:SetText(("%.1f, %.1f"):format(x * 100, y * 100))
-    else
+    if type(GetPlayerMapPosition) ~= "function" then
         coords:SetText("")
+        return
     end
+    local ok, text = pcall(function()
+        local x, y = GetPlayerMapPosition("player")
+        if x and x > 0 then
+            return ("%.1f, %.1f"):format(x * 100, y * 100)
+        end
+        return ""
+    end)
+    coords:SetText(ok and text or "")
 end
 
 local SEGMENTS = 36

@@ -20,19 +20,27 @@ local function safe(fn, ...)
     if type(fn) == "function" then return fn(...) end
 end
 
+local function try(fn, fallback)
+    return (OpenUI.Try and OpenUI.Try(fn, fallback)) or fallback
+end
+
 local function classColor(unit)
-    local class = safe(UnitClass, unit)
-    local colors = _G.RAID_CLASS_COLORS
-    if class and type(colors) == "table" and type(colors[class]) == "table" then
-        local c = colors[class]
-        return { c.r or c[1], c.g or c[2], c.b or c[3], 1 }
-    end
+    local ok, color = pcall(function()
+        local class = UnitClass(unit)
+        local colors = _G.RAID_CLASS_COLORS
+        if class and type(colors) == "table" and type(colors[class]) == "table" then
+            local c = colors[class]
+            return { c.r or c[1], c.g or c[2], c.b or c[3], 1 }
+        end
+        return nil
+    end)
+    if ok and color then return color end
     local primary = Theme.Get("color.primary")
     return { primary[1], primary[2], primary[3], 1 }
 end
 
 local function reactionColor(unit)
-    local reaction = safe(UnitReaction, unit, "player")
+    local reaction = try(function() return UnitReaction(unit, "player") end, nil)
     if type(reaction) == "number" then
         if reaction >= 5 then
             return { 0.29, 0.74, 0.45, 1 }
@@ -94,14 +102,24 @@ local function updateUnit(parts, unit, colorFor)
         setBar(parts.power, 0, nil, 208, 6)
         return
     end
-    local name = safe(UnitName, unit)
-    parts.name:SetText(type(name) == "string" and name or "")
-    local hp, hpMax = safe(UnitHealth, unit) or 0, safe(UnitHealthMax, unit) or 1
-    local pp, ppMax = safe(UnitPower, unit) or 0, safe(UnitPowerMax, unit) or 1
-    setBar(parts.health, hpMax > 0 and hp / hpMax or 0, colorFor(unit), 208, 10)
-    setBar(parts.power, ppMax > 0 and pp / ppMax or 0, Theme.Get("color.primary"), 208, 6)
-    parts.healthText:SetText(("%d / %d"):format(hp, hpMax))
-    parts.frame.openuiHealthRatio = hpMax > 0 and hp / hpMax or 0
+    local displayName = try(function()
+        local name = UnitName(unit)
+        if type(name) == "string" then return name end
+        return ""
+    end, "")
+    pcall(function() parts.name:SetText(displayName or "") end)
+    local hp = safe(UnitHealth, unit)
+    local hpMax = safe(UnitHealthMax, unit)
+    local pp = safe(UnitPower, unit)
+    local ppMax = safe(UnitPowerMax, unit)
+    -- Secret Values 兼容：除法/格式化可能抛错 → 降级为空条与空文本
+    local healthRatio = try(function() return hpMax > 0 and hp / hpMax or 0 end, 0)
+    local powerRatio = try(function() return ppMax > 0 and pp / ppMax or 0 end, 0)
+    local healthText = try(function() return ("%d / %d"):format(hp, hpMax) end, "")
+    setBar(parts.health, healthRatio, try(function() return colorFor(unit) end, nil), 208, 10)
+    setBar(parts.power, powerRatio, Theme.Get("color.primary"), 208, 6)
+    parts.healthText:SetText(healthText or "")
+    parts.frame.openuiHealthRatio = healthRatio or 0
 end
 
 function UnitFrames.UpdatePlayer()

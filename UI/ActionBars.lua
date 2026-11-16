@@ -67,24 +67,36 @@ end
 local function refreshActionButton(button, slot)
     paintButtonBg(button)
     local texture = actionTexture(slot)
-    button.openuiIcon:SetTexture(texture)
-    local count = 0
-    if type(GetActionCount) == "function" then count = GetActionCount(slot) or 0 end
-    button.openuiCount:SetText(count > 1 and tostring(count) or "")
+    pcall(function() button.openuiIcon:SetTexture(texture) end)
+    local countText = ""
+    if type(GetActionCount) == "function" then
+        local ok, text = pcall(function()
+            local count = GetActionCount(slot) or 0
+            return count > 1 and tostring(count) or ""
+        end)
+        if ok then countText = text end
+    end
+    button.openuiCount:SetText(countText)
 end
 
 local function refreshPetButton(button, slot)
     paintButtonBg(button)
-    local texture, count
-    if type(GetPetActionInfo) == "function" then
-        local name, _, tex = GetPetActionInfo(slot)
-        texture = tex
-        if type(name) == "string" and type(_G[name]) == "number" then
-            count = _G[name]
+    local ok = pcall(function()
+        local texture, count
+        if type(GetPetActionInfo) == "function" then
+            local name, _, tex = GetPetActionInfo(slot)
+            texture = tex
+            if type(name) == "string" and type(_G[name]) == "number" then
+                count = _G[name]
+            end
         end
+        button.openuiIcon:SetTexture(texture)
+        button.openuiCount:SetText((type(count) == "number" and count > 1) and tostring(count) or "")
+    end)
+    if not ok then
+        pcall(function() button.openuiIcon:SetTexture(nil) end)
+        button.openuiCount:SetText("")
     end
-    button.openuiIcon:SetTexture(texture)
-    button.openuiCount:SetText((type(count) == "number" and count > 1) and tostring(count) or "")
 end
 
 local function refreshMainIcons()

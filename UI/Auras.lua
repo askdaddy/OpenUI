@@ -21,19 +21,25 @@ local function safe(fn, ...)
     if type(fn) == "function" then return fn(...) end
 end
 
+local function try(fn, fallback)
+    return (OpenUI.Try and OpenUI.Try(fn, fallback)) or fallback
+end
+
 local function collect(kind)
     local query = kind == "Buff" and UnitBuff or UnitDebuff
     local list = {}
     if type(query) == "function" then
-        for i = 1, 40 do
-            local name, _, icon, stacks, _, duration, expiration = query("player", i)
-            if not name then break end
-            list[#list + 1] = {
-                icon = icon,
-                stacks = tonumber(stacks) or 0,
-                expiration = tonumber(expiration) or 0,
-            }
-        end
+        pcall(function()
+            for i = 1, 40 do
+                local name, _, icon, stacks, _, duration, expiration = query("player", i)
+                if not name then break end
+                list[#list + 1] = {
+                    icon = icon,
+                    stacks = tonumber(stacks) or 0,
+                    expiration = tonumber(expiration) or 0,
+                }
+            end
+        end)
     end
     return list
 end
@@ -88,14 +94,17 @@ local function updateRow(kind)
         local slot = row.slots[i]
         local aura = list[i]
         if aura then
-            slot.icon:SetTexture(aura.icon)
-            slot.count:SetText(aura.stacks > 1 and tostring(aura.stacks) or "")
-            if aura.expiration > 0 then
-                slot.time:SetText(formatRemain(math.max(aura.expiration - now, 0)))
-            else
-                slot.time:SetText("")
-            end
-            slot.button:Show()
+            -- Secret Values：图标/层数/时间任何一步抛错 → 该槽降级隐藏
+            local ok = pcall(function()
+                slot.icon:SetTexture(aura.icon)
+                slot.count:SetText(aura.stacks > 1 and tostring(aura.stacks) or "")
+                if aura.expiration > 0 then
+                    slot.time:SetText(formatRemain(math.max(aura.expiration - now, 0)))
+                else
+                    slot.time:SetText("")
+                end
+            end)
+            if ok then slot.button:Show() else slot.button:Hide() end
         else
             slot.button:Hide()
         end

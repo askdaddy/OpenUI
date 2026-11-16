@@ -32,6 +32,14 @@ local function Run(owner, func, ...)
 end
 OpenUI.Run = Run
 
+-- Secret Values 兼容（Forever 客户端）：受污染执行中对秘密数值的算术/格式化会抛错。
+-- 用 pcall 包裹并降级，避免战斗信息路径炸掉整个模块。
+function OpenUI.Try(fn, fallback)
+    local ok, value = pcall(fn)
+    if ok then return value end
+    return fallback
+end
+
 function OpenUI:RegisterModule(name, defs)
     assert(type(name) == "string" and name ~= "", L.MODULE_INVALID .. tostring(name))
     assert(self.modules[name] == nil, L.MODULE_DUPLICATE .. name)

@@ -24,12 +24,13 @@ end
 Nameplates._setColor = setColor
 
 local function reactionToken(unit)
-    local reaction = safe(UnitReaction, unit, "player")
-    if type(reaction) == "number" then
+    local ok, token = pcall(function()
+        local reaction = UnitReaction(unit, "player")
         if reaction >= 5 then return "color.secondary" end
         if reaction == 4 then return "color.tertiary" end
         return "color.error"
-    end
+    end)
+    if ok and token then return token end
     return "color.secondary"
 end
 
