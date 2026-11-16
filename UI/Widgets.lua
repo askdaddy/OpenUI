@@ -29,7 +29,12 @@ function Widgets.MakeDraggable(frame, section, key, point)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
         local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
-        if alt and OpenUI:CanModifyNow() then self:StartMoving() end
+        if alt and OpenUI:CanModifyNow() then
+            self:StartMoving()
+            if OpenUI.Grid and type(OpenUI.Grid.NotifyDragStart) == "function" then
+                OpenUI.Grid.NotifyDragStart()
+            end
+        end
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
@@ -47,6 +52,9 @@ function Widgets.MakeDraggable(frame, section, key, point)
         local cfg = activeConfig()
         if type(cfg[section]) ~= "table" then cfg[section] = {} end
         cfg[section][key] = { x = x, y = y }
+        if OpenUI.Grid and type(OpenUI.Grid.NotifyDragEnd) == "function" then
+            OpenUI.Grid.NotifyDragEnd()
+        end
     end)
     local cfg = activeConfig()
     local saved = type(cfg[section]) == "table" and cfg[section][key]
