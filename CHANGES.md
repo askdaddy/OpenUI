@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 诊断增强（#66）：probe v4——五图层着色矩阵（BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY 同红色对照，独立裸帧避免面板干扰）+ surface 色 ARTWORK 对照组，一次截图确定客户端可用图层。（#66）
 - **根因修复（#65）：Forever 客户端 BACKGROUND 纹理层渲染为白色**（probe v3 四对照条确证：ARTWORK 正常、BACKGROUND 全白）。全部填充纹理（面板/按钮/条轨/网格线/搜索框/光环底）由 BACKGROUND 迁移至 **ARTWORK**（按创建序保持层级）；描边统一 **OVERLAY**（填充之上）；probe 主条扫描改为仅 Frame 对象、每行一条。（#65）
 - 诊断增强（#64）：probe v3——样块面板屏上显示 surface/on-surface/opacity/palette 数值与四条对照（α=1/α=0.88/WHITE8X8 顶点色/0.5 灰参考），并扫描全局输出 MainMenu/MainBar/ActionBar 候选帧名（定位原生主条真名）。（#64）
 - 诊断增强（#60）：`/openui probe` v2——打印 `OpenUIDB.theme` 全量键值（检测旧/异常定制）、主题行首尾各打印一次（防聊天滚动丢失）、用真实 Panel 管线渲染"surface 底 + onSurface 文字 + outline 边框"样块（与红/绿测试块对照定位"值浅 vs 渲染浅"）。（#60）
