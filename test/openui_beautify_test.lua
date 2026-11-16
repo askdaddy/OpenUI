@@ -128,9 +128,9 @@ check(sheen ~= nil and math.abs(sheen.gradient.c1.a - 0.35) < 1e-9
 local button = Widgets.Button(UIParent, "OK")
 local btnEdges = 0
 for _, tex in ipairs(button.textures) do
-    if tex.r == border[1] and tex.a == 0.7 then btnEdges = btnEdges + 1 end
+    if tex.r == border[1] and tex.a == 0.75 then btnEdges = btnEdges + 1 end
 end
-check(btnEdges == 4, "Button 四边细边框（×0.7，实际 " .. btnEdges .. "）")
+check(btnEdges == 4, "Button 四边细边框（×0.75，实际 " .. btnEdges .. "）")
 -- 配色联动
 Theme.SetPalette("moss")
 local newBorder = Theme.Get("color.outline-variant")

@@ -110,7 +110,11 @@ local function build()
         local track = Theme.Get("color.surface-container-highest")
         parts.track:SetColorTexture(track[1], track[2], track[3], 1)
         local primary = Theme.Get("color.primary")
-        parts.bar:SetColorTexture(primary[1], primary[2], primary[3], 1)
+        if Widgets.GradientFill then
+            Widgets.GradientFill(parts.bar, primary)
+        else
+            parts.bar:SetColorTexture(primary[1], primary[2], primary[3], 1)
+        end
     end
     paint(player)
     paint(target)
