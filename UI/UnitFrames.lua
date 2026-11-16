@@ -87,16 +87,20 @@ local function buildUnitFrame(point, label)
     local power = frame:CreateTexture(nil, "ARTWORK")
     power:SetPoint("TOPLEFT", powerBg, "TOPLEFT", 0, 0)
     power:SetSize(208, 6)
-    -- #56：条外 1px 暗描边（黑 ×0.7，参照效果图）
-    local function barEdge(anchor, width, height)
-        local tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
-        tex:SetColorTexture(0, 0, 0, 0.7)
-        tex:SetPoint("TOPLEFT", anchor, "TOPLEFT", -1, 1)
-        tex:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 1, -1)
-        return tex
+    -- #56/#69：条外 1px 暗描边（四边正确边线）
+    local function barEdges(anchor)
+        local list = {}
+        local dark = { 0, 0, 0 }
+        if OpenUI.Widgets and OpenUI.Widgets.Edge then
+            for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+                local t = OpenUI.Widgets.Edge(anchor, side, dark, 0.7)
+                if t then list[#list + 1] = t end
+            end
+        end
+        return list
     end
-    local healthEdge = barEdge(healthBg)
-    local powerEdge = barEdge(powerBg)
+    local healthEdge = barEdges(healthBg)
+    local powerEdge = barEdges(powerBg)
     return {
         frame = frame, name = name,
         health = health, healthBg = healthBg, healthText = healthText,

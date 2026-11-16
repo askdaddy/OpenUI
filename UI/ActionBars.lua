@@ -78,21 +78,13 @@ local function skinButton(button)
         count:SetShadowOffset(1, -1)
         if type(count.SetShadowColor) == "function" then count:SetShadowColor(0, 0, 0, 0.9) end
     end
-    -- #56：图标外 1px 银灰描边（4 边）
+    -- #56/#69：图标外 1px 银灰描边（正确边线，避免全框薄膜）
     local border = Theme.Get("color.outline")
-    if border then
+    if border and OpenUI.Widgets and OpenUI.Widgets.Edge then
         local edges = {}
-        local function edge(x1, y1, x2, y2)
-            local tex = button:CreateTexture(nil, "OVERLAY", nil, 7)
-            tex:SetColorTexture(border[1], border[2], border[3], 0.8)
-            tex:SetPoint("TOPLEFT", button, "TOPLEFT", x1, y1)
-            tex:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", x2, y2)
-            edges[#edges + 1] = tex
+        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+            edges[#edges + 1] = OpenUI.Widgets.Edge(button, side, border, 0.8)
         end
-        edge(0, 0, 0, -1)
-        edge(0, 1, 0, 0)
-        edge(0, 0, 1, 0)
-        edge(-1, 0, 0, 0)
         button.openuiEdges = edges
     end
     button.openuiBg, button.openuiIcon, button.openuiCount = bg, icon, count

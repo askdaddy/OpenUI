@@ -98,14 +98,35 @@ function Widgets.MakeDraggable(frame, section, key, point)
     end
 end
 
-local function edgeTexture(frame, x1, y1, x2, y2, color, alpha)
+-- #69：1px 边线（每边两点锚定 + SetHeight/SetWidth；修正旧实现"下边"生成全框薄膜的错误）
+function Widgets.Edge(frame, side, color, alpha)
+    if type(frame) ~= "table" or type(color) ~= "table" then return nil end
     local t = frame:CreateTexture(nil, "OVERLAY", nil, 7)
     if type(t.SetColorTexture) == "function" then
         t:SetColorTexture(color[1], color[2], color[3], alpha)
     end
-    t:SetPoint("TOPLEFT", frame, "TOPLEFT", x1, y1)
-    t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", x2, y2)
+    if side == "top" then
+        t:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+        t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+        if type(t.SetHeight) == "function" then t:SetHeight(1) end
+    elseif side == "bottom" then
+        t:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+        t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        if type(t.SetHeight) == "function" then t:SetHeight(1) end
+    elseif side == "left" then
+        t:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+        t:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+        if type(t.SetWidth) == "function" then t:SetWidth(1) end
+    elseif side == "right" then
+        t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+        t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        if type(t.SetWidth) == "function" then t:SetWidth(1) end
+    end
     return t
+end
+
+local function edgeTexture(frame, side, color, alpha)
+    return Widgets.Edge(frame, side, color, alpha)
 end
 
 -- 顶层装饰实例随 Refresh 换色
@@ -115,10 +136,10 @@ local function decorate(frame, kind)
     local border = Theme.Get("color.outline")
     local alpha = kind == "panel" and 0.95 or 0.8
     local edges = {
-        edgeTexture(frame, 0, 0, 0, -1, border, alpha),   -- 上
-        edgeTexture(frame, 0, 1, 0, 0, border, alpha),    -- 下
-        edgeTexture(frame, 0, 0, 1, 0, border, alpha),    -- 左
-        edgeTexture(frame, -1, 0, 0, 0, border, alpha),   -- 右
+        edgeTexture(frame, "top", border, alpha),
+        edgeTexture(frame, "bottom", border, alpha),
+        edgeTexture(frame, "left", border, alpha),
+        edgeTexture(frame, "right", border, alpha),
     }
     -- #58：移除通体 sheen 渐变与顶部亮带（Forever 客户端渲染成白纱覆盖深色底）
     decorated[#decorated + 1] = { frame = frame, edges = edges, kind = kind }
