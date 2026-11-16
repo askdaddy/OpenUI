@@ -214,6 +214,10 @@ function Settings.ApplyFilter(query)
     if noResultsText then
         if (not any) and query ~= "" then noResultsText:Show() else noResultsText:Hide() end
     end
+    -- 无结果时隐藏当前页内容，避免提示文本叠在页面上
+    if currentPage and pageFrames[currentPage] then
+        if any or query == "" then pageFrames[currentPage]:Show() else pageFrames[currentPage]:Hide() end
+    end
 end
 
 local function build()
@@ -255,6 +259,15 @@ local function build()
     searchBg:SetColorTexture(sc[1], sc[2], sc[3], 0.9)
     searchBox:SetScript("OnTextChanged", function(self)
         Settings.ApplyFilter(self:GetText())
+    end)
+    searchBox:SetScript("OnMouseDown", function(self)
+        self:SetFocus()
+    end)
+    searchBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+    searchBox:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
     end)
 
     local y = -94

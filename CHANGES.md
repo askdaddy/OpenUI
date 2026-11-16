@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 验收修复二：设置搜索框点击聚焦/ESC 退出并支持回车退出；搜索无结果时隐藏当前页内容（防提示叠页）；动作条主条支持**拖拽移动**并将位置持久化到生效配置档（脱战可拖，宠物条随主条）；`ClearAllPoints` 守卫（#8/#11 验收修复）。
 - 验收修复：Widgets Button/Toggle 标签 FontString 补锚定（未锚定 Region 在客户端不渲染，导致设置窗口按钮无文字）；按钮/开关背景改用 surface-container-high 提升对比度；设置搜索框增加可见背景；动作条图标读取增加 C_ActionBar 回退；新增 `/openui probe` 现场诊断命令（动作 API/槽位纹理/动作条状态）（#8/#11 验收修复）。
 - 媒体选择与缺失处理 T1：`Media.Options`（内部+外部去重合并的选择器/预览数据源）、`Media.Resolve`（internal/external/missing 三态、缺失软报告并回退）、`Media.SetConfigName`（配置只存媒体名标识，导出串不嵌入素材本体）（#43）。
 - 特殊场景 T1（B1，默认关闭）：经共享助手 OpenUI.Restyle 主题化命名原生帧（背景/边框/字号，关闭恢复、换色联动、缺帧守卫）（#31）。

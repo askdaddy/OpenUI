@@ -107,10 +107,45 @@ local function refreshAll()
     refreshPetIcons()
 end
 
+-- 生效配置（#13 引入的 Profile 语义）：动作条位置存当前配置档。
+local function activeConfig()
+    if OpenUI.Profile and OpenUI.Profile.Config then
+        local cfg = OpenUI.Profile.Config()
+        if type(cfg) == "table" then return cfg end
+    end
+    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
+    return _G.OpenUIDB
+end
+
+local function savePosition()
+    if not mainBar or type(mainBar.GetLeft) ~= "function" then return end
+    local cfg = activeConfig()
+    if type(cfg.actionbars) ~= "table" then cfg.actionbars = {} end
+    cfg.actionbars.x = mainBar:GetLeft()
+    cfg.actionbars.y = mainBar:GetBottom()
+end
+
+local function restorePosition()
+    local cfg = activeConfig()
+    local pos = type(cfg.actionbars) == "table" and cfg.actionbars or {}
+    if type(mainBar.ClearAllPoints) == "function" then mainBar:ClearAllPoints() end
+    mainBar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", pos.x or 0, pos.y or 24)
+end
+
 local function buildMainBar()
     mainBar = CreateFrame("Frame", "OpenUIActionBar", UIParent, "SecureHandlerStateTemplate")
     mainBar:SetSize(MAIN_SLOTS * (BUTTON_SIZE + BUTTON_GAP), BUTTON_SIZE)
-    mainBar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 24)
+    restorePosition()
+    mainBar:SetMovable(true)
+    mainBar:EnableMouse(true)
+    mainBar:RegisterForDrag("LeftButton")
+    mainBar:SetScript("OnDragStart", function(self)
+        if OpenUI:CanModifyNow() then self:StartMoving() end
+    end)
+    mainBar:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        savePosition()
+    end)
     for i = 1, MAIN_SLOTS do
         local button = CreateFrame("Button", nil, mainBar, "SecureActionButtonTemplate")
         button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
