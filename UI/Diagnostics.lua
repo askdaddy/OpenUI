@@ -46,6 +46,13 @@ local function build()
     editBox = CreateFrame("EditBox", nil, frame)
     editBox:SetMultiLine(true)
     editBox:SetAutoFocus(false)
+    -- 点击聚焦后才能拖选/Ctrl+C；Esc 取消聚焦
+    editBox:SetScript("OnMouseDown", function(self)
+        self:SetFocus()
+    end)
+    editBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
     -- EditBox 无字体对象时不渲染文本（与搜索框同类问题）
     if type(editBox.SetFontObject) == "function" and type(ChatFontNormal) == "table" then
         editBox:SetFontObject(ChatFontNormal)
