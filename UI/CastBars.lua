@@ -98,7 +98,12 @@ local function buildUnit(point, name)
     bar:SetSize(0, BAR_HEIGHT)
     local text = Widgets.Text(frame, "", "label")
     text:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -16)
-    return { frame = frame, name = label, track = track, bar = bar, text = text, shownCast = false }
+    -- #56：进度条 1px 暗描边
+    local barEdge = frame:CreateTexture(nil, "BORDER")
+    barEdge:SetColorTexture(0, 0, 0, 0.7)
+    barEdge:SetPoint("TOPLEFT", track, "TOPLEFT", -1, 1)
+    barEdge:SetPoint("BOTTOMRIGHT", track, "BOTTOMRIGHT", 1, -1)
+    return { frame = frame, name = label, track = track, bar = bar, text = text, barEdge = barEdge, shownCast = false }
 end
 
 local function build()

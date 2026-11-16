@@ -66,7 +66,7 @@ local function buildRow(kind, point)
         local timeText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         timeText:SetPoint("TOP", button, "BOTTOM", 0, 0)
         local bc = Theme.Get(borderColor)
-        border:SetColorTexture(bc[1], bc[2], bc[3], 0.8)
+        border:SetColorTexture(bc[1], bc[2], bc[3], 0.9)
         slots[i] = { button = button, icon = icon, count = count, time = timeText, border = border }
     end
     rows[kind] = { frame = frame, slots = slots, list = {} }

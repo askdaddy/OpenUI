@@ -80,17 +80,28 @@ local function buildUnitFrame(point, label)
     health:SetPoint("TOPLEFT", healthBg, "TOPLEFT", 0, 0)
     health:SetSize(208, 10)
     local healthText = Widgets.Text(frame, "", "label")
-    healthText:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -32)
+    healthText:SetPoint("CENTER", healthBg, "CENTER", 0, 0)
     local powerBg = frame:CreateTexture(nil, "BACKGROUND")
     powerBg:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -36)
     powerBg:SetSize(208, 6)
     local power = frame:CreateTexture(nil, "ARTWORK")
     power:SetPoint("TOPLEFT", powerBg, "TOPLEFT", 0, 0)
     power:SetSize(208, 6)
+    -- #56：条外 1px 暗描边（黑 ×0.7，参照效果图）
+    local function barEdge(anchor, width, height)
+        local tex = frame:CreateTexture(nil, "BORDER")
+        tex:SetColorTexture(0, 0, 0, 0.7)
+        tex:SetPoint("TOPLEFT", anchor, "TOPLEFT", -1, 1)
+        tex:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 1, -1)
+        return tex
+    end
+    local healthEdge = barEdge(healthBg)
+    local powerEdge = barEdge(powerBg)
     return {
         frame = frame, name = name,
         health = health, healthBg = healthBg, healthText = healthText,
         power = power, powerBg = powerBg,
+        healthEdge = healthEdge, powerEdge = powerEdge,
     }
 end
 

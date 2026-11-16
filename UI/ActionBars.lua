@@ -74,6 +74,27 @@ local function skinButton(button)
     icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
     local count = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    if type(count.SetShadowOffset) == "function" then
+        count:SetShadowOffset(1, -1)
+        if type(count.SetShadowColor) == "function" then count:SetShadowColor(0, 0, 0, 0.9) end
+    end
+    -- #56：图标外 1px 银灰描边（4 边）
+    local border = Theme.Get("color.outline")
+    if border then
+        local edges = {}
+        local function edge(x1, y1, x2, y2)
+            local tex = button:CreateTexture(nil, "BORDER")
+            tex:SetColorTexture(border[1], border[2], border[3], 0.8)
+            tex:SetPoint("TOPLEFT", button, "TOPLEFT", x1, y1)
+            tex:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", x2, y2)
+            edges[#edges + 1] = tex
+        end
+        edge(0, 0, 0, -1)
+        edge(0, 1, 0, 0)
+        edge(0, 0, 1, 0)
+        edge(-1, 0, 0, 0)
+        button.openuiEdges = edges
+    end
     button.openuiBg, button.openuiIcon, button.openuiCount = bg, icon, count
 end
 

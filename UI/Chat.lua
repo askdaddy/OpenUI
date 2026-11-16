@@ -49,9 +49,9 @@ local function applyTo(frame)
         local alpha = Theme.Get("opacity.panel") or 1
         frame:SetBackdropColor(bg[1], bg[2], bg[3], alpha)
     end
-    local border = Theme.Get("color.outline-variant")
+    local border = Theme.Get("color.outline")
     if frame.SetBackdropBorderColor and border then
-        frame:SetBackdropBorderColor(border[1], border[2], border[3], 1)
+        frame:SetBackdropBorderColor(border[1], border[2], border[3], 0.95)
     end
     local body = Theme.Get("type.body")
     if frame.SetFont and type(body) == "table" then
