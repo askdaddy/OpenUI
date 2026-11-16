@@ -60,10 +60,10 @@ local function setBar(bar, ratio, color, width, height)
     bar.openuiRatio = ratio
 end
 
-local function buildUnitFrame(anchor, label)
+local function buildUnitFrame(point, label)
     local frame = Widgets.Panel(UIParent, { name = label })
     frame:SetSize(220, 46)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, anchor)
+    frame:SetPoint(point[1], UIParent, point[2], point[3], point[4])
     local name = Widgets.Text(frame, "", "label")
     name:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -4)
     local healthBg = frame:CreateTexture(nil, "BACKGROUND")
@@ -133,11 +133,14 @@ end
 local function build()
     if built then return end
     built = true
-    player = buildUnitFrame(120, "OpenUIPlayerFrame")
-    target = buildUnitFrame(60, "OpenUITargetFrame")
+    player = buildUnitFrame({ "TOPLEFT", "TOPLEFT", 20, -24 }, "OpenUIPlayerFrame")
+    target = buildUnitFrame({ "TOPLEFT", "TOPLEFT", 20, -76 }, "OpenUITargetFrame")
     playerFrame, targetFrame = player.frame, target.frame
     paintStatic(player)
     paintStatic(target)
+    -- #50：统一 Alt+左键拖拽与位置持久化
+    Widgets.MakeDraggable(playerFrame, "unitframes", "player", { "TOPLEFT", "TOPLEFT", 20, -24 })
+    Widgets.MakeDraggable(targetFrame, "unitframes", "target", { "TOPLEFT", "TOPLEFT", 20, -76 })
 end
 
 function UnitFrames.OnEnable()
@@ -162,6 +165,20 @@ function UnitFrames.UpdateAll()
     UnitFrames.UpdatePlayer()
     UnitFrames.UpdateTarget()
 end
+
+-- #50：配色切换后重绘静态底纹与能量条颜色
+function UnitFrames.ApplyTheme()
+    if not built then return end
+    for _, parts in ipairs({ player, target }) do
+        if parts.frame then
+            paintStatic(parts)
+            local primary = Theme.Get("color.primary")
+            if primary then parts.power:SetColorTexture(primary[1], primary[2], primary[3], 1) end
+        end
+    end
+end
+
+if Theme.RegisterRefresh then Theme.RegisterRefresh(UnitFrames.ApplyTheme) end
 
 function UnitFrames.OnDisable()
     eventsRegistered = false

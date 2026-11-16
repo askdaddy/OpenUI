@@ -92,7 +92,7 @@ WorldMapFrame = mkframe("Frame","WorldMapFrame",UIParent)
 WorldMapFrame.bgColor = {0.1,0.1,0.1,1}
 Restyle.Apply("Test", { "WorldMapFrame", "NoSuchFrame" })
 local surf = Theme.Get("color.surface")
-ck(WorldMapFrame.bgColor[1]==surf[1] and WorldMapFrame.bgColor[4]==0.95, "Restyle applies themed bg")
+ck(WorldMapFrame.bgColor[1]==surf[1] and WorldMapFrame.bgColor[4]==0.88, "Restyle applies themed bg")
 Theme.SetPalette("moss")
 local mossSurf = Theme.Get("color.surface")
 ck(WorldMapFrame.bgColor[1]==mossSurf[1], "Restyle palette refresh")

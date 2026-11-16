@@ -144,21 +144,21 @@ coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 local surf = Theme.Get("color.surface")
 local ov = Theme.Get("color.outline-variant")
-check(eq(ChatFrame1.bgColor, { surf[1], surf[2], surf[3], 0.95 }), "ChatFrame1 背景 = surface × opacity.panel")
+check(eq(ChatFrame1.bgColor, { surf[1], surf[2], surf[3], 0.88 }), "ChatFrame1 背景 = surface × opacity.panel")
 check(eq(ChatFrame1.borderColor, { ov[1], ov[2], ov[3], 1 }), "ChatFrame1 边框 = outline-variant")
 check(ChatFrame1.font[1] == "FRIZQT__.TTF" and ChatFrame1.font[2] == 13,
     "字体文件保留、字号 = type.body")
-check(eq(ChatFrame2.bgColor, { surf[1], surf[2], surf[3], 0.95 }),
+check(eq(ChatFrame2.bgColor, { surf[1], surf[2], surf[3], 0.88 }),
     "无边框 setter 的帧不崩溃且背景生效（守卫）")
-check(eq(ChatFrame1EditBox.bgColor, { surf[1], surf[2], surf[3], 0.95 }), "输入框背景主题化")
+check(eq(ChatFrame1EditBox.bgColor, { surf[1], surf[2], surf[3], 0.88 }), "输入框背景主题化")
 
 print("== S2 主题联动与重应用（步骤 2）==")
 Theme.SetPalette("moss")
 local moss = Theme.Get("color.surface")
-check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.95 }), "换配色即时联动")
+check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.88 }), "换配色即时联动")
 ChatFrame1.bgColor = { 0, 0, 0, 0 }
 resFrame.scripts.OnEvent(resFrame, "PLAYER_ENTERING_WORLD")
-check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.95 }), "PLAYER_ENTERING_WORLD 重应用")
+check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.88 }), "PLAYER_ENTERING_WORLD 重应用")
 
 print("== S3 关闭恢复与重启（步骤 1）==")
 OpenUI:DisableModule("Chat")
@@ -168,7 +168,7 @@ check(ChatFrame1.font[2] == 14, "字号恢复原值")
 check(eq(ChatFrame2.bgColor, { 0.5, 0.5, 0.5, 0.5 }), "ChatFrame2 恢复")
 check(eq(ChatFrame1EditBox.bgColor, { 0.5, 0.5, 0.5, 0.5 }), "输入框恢复")
 OpenUI:EnableModule("Chat")
-check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.95 }), "重新启用再次主题化")
+check(eq(ChatFrame1.bgColor, { moss[1], moss[2], moss[3], 0.88 }), "重新启用再次主题化")
 
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then

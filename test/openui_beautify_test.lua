@@ -118,25 +118,25 @@ local border = Theme.Get("color.outline-variant")
 local edges = 0
 local sheen
 for _, tex in ipairs(panel.textures) do
-    if tex.r == border[1] and tex.g == border[2] and tex.a == 0.85 then edges = edges + 1 end
+    if tex.r == border[1] and tex.g == border[2] and tex.a == 0.9 then edges = edges + 1 end
     if tex.gradient then sheen = tex end
 end
-check(edges == 4, "Panel 四边 1px 边框（outline-variant ×0.85，实际 " .. edges .. "）")
+check(edges == 4, "Panel 四边 1px 边框（outline-variant ×0.9，实际 " .. edges .. "）")
 check(sheen ~= nil and sheen.gradient.orientation == "VERTICAL", "Panel 顶部 sheen 渐变（VERTICAL）")
-check(sheen ~= nil and math.abs(sheen.gradient.c1.a - 0.12) < 1e-9
-    and sheen.gradient.c2.a == 0, "sheen 自 0.12 渐隐至 0")
+check(sheen ~= nil and math.abs(sheen.gradient.c1.a - 0.35) < 1e-9
+    and sheen.gradient.c2.a == 0, "sheen 自 0.35 渐隐至 0")
 local button = Widgets.Button(UIParent, "OK")
 local btnEdges = 0
 for _, tex in ipairs(button.textures) do
-    if tex.r == border[1] and tex.a == 0.6 then btnEdges = btnEdges + 1 end
+    if tex.r == border[1] and tex.a == 0.7 then btnEdges = btnEdges + 1 end
 end
-check(btnEdges == 4, "Button 四边细边框（×0.6，实际 " .. btnEdges .. "）")
+check(btnEdges == 4, "Button 四边细边框（×0.7，实际 " .. btnEdges .. "）")
 -- 配色联动
 Theme.SetPalette("moss")
 local newBorder = Theme.Get("color.outline-variant")
 local updated = 0
 for _, tex in ipairs(panel.textures) do
-    if tex.r == newBorder[1] and tex.g == newBorder[2] and tex.a == 0.85 then updated = updated + 1 end
+    if tex.r == newBorder[1] and tex.g == newBorder[2] and tex.a == 0.9 then updated = updated + 1 end
 end
 check(updated == 4, "换配色后边框随 Refresh 换色")
 -- 缺失 API 降级
@@ -148,7 +148,7 @@ check(ok, "CreateColor 缺失时零报错（无 sheen 降级）")
 -- 基色保持（旧断言不回归）
 local baseOk = false
 for _, tex in ipairs(panel.textures) do
-    if tex.a == 0.95 then baseOk = true end
+    if tex.a == 0.88 then baseOk = true end
 end
 check(baseOk, "半透明基色（opacity.panel）保持")
 

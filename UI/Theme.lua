@@ -79,7 +79,7 @@ local COLOR_ALIASES = {
 
 -- 非色彩预设注册表：token -> { value, kind, min, max }（#3 旧值 + #7 新增）。
 local PRESET = {
-    ["opacity.panel"] = { value = 0.95, kind = "number", min = 0, max = 1 },
+    ["opacity.panel"] = { value = 0.88, kind = "number", min = 0, max = 1 },
     -- 旧字体角色（静态兼容值，语义保持）
     ["font.small"]    = { value = { file = nil, size = 11, flags = nil }, kind = "font" },
     ["font.normal"]   = { value = { file = nil, size = 13, flags = nil }, kind = "font" },
@@ -151,6 +151,9 @@ local function colorTokenOf(token)
     if token:sub(1, 6) == "color." then return token end
     return nil
 end
+
+-- #50：主题刷新订阅（模块在配色/定制变化后重绘自身原生纹理）
+local refreshHooks = {}
 
 local resolved = {}        -- token -> 全局生效值（配色/预设 + OpenUIDB.theme 合法定制）
 local moduleOverrides = {} -- 模块名 -> token -> 覆盖值（仅内存，不落库）
@@ -234,9 +237,16 @@ local function rebuild()
     if OpenUI.Widgets then OpenUI.Widgets.Refresh() end
     if OpenUI.Chat and OpenUI.Chat.ApplyTheme then OpenUI.Chat.ApplyTheme() end
     if OpenUI.Restyle and OpenUI.Restyle.RefreshAll then OpenUI.Restyle.RefreshAll() end
+    for i = 1, #refreshHooks do
+        pcall(refreshHooks[i])
+    end
 end
 
 local Theme = {}
+
+function Theme.RegisterRefresh(fn)
+    if type(fn) == "function" then refreshHooks[#refreshHooks + 1] = fn end
+end
 
 function Theme.Tokens()
     local list = {}

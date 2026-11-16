@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- UI 拖拽统一与视觉 v2（#50）：新增 `Widgets.MakeDraggable`（Alt+左键，脱战，位置持久化到生效配置档）并接入单位框体/施法条/光环/宠物条（含宠物按钮 Alt 转发）；单位框体默认移至左上、施法条/光环重排避让屏幕中心；`Theme.RegisterRefresh` 订阅——UnitFrames/CastBars/Auras 底纹与描边随配色重绘；`opacity.panel` 默认 0.95→**0.88**（可见半透明），面板 sheen 渐变增强 0.35→0 与 24px 亮带降级、边框 alpha 面板 0.9/按钮 0.7。（#50）
 - 系统 UI 遮盖机制（#49）：Native 助手升级——保存模块声明的帧名清单（含未加载帧），ADDON_LOADED/PLAYER_ENTERING_WORLD/脱战自动重应用（延迟加载的暴雪帧出现即隐藏）；动作条迁移至 Native 并覆盖 MainMenuBar+MultiBar×7+PetActionBar，光环补 DebuffFrame；每模块独立记账、恢复幂等；`OpenUI.Native.Snapshot()` 供 `/openui probe` 查看隐藏清单。（#49）
 - UI 基础美化（#48）：全部 Widgets.Panel 与 Button/Toggle 增加 **1px 细边框**（outline-variant，面板 0.85 / 按钮 0.6）与面板**顶部 sheen 渐变**（surface-container-highest 0.12→0，SetGradient 可用时）；半透明基色保持；配色切换时装饰随 Refresh 换色；缺失 CreateColor/SetGradient 自动降级零报错。（#48）
 - 动作条 T2（#47）：新增 bar2–bar6（各 12 安全按钮，固定槽 13–72；主条保持安全分页）；每 bar 独立显示开关（默认仅主条）与独立位置（Alt+左键/条体拖拽，脱战，持久化到生效配置档）；原生多动作条全部隐藏与关闭恢复；设置面板「动作条」模块小窗含 6 条开关与拖拽提示；3 个新双语 key（66/66）。（#47）

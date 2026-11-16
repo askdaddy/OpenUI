@@ -145,7 +145,7 @@ check(T.Get("color.warn") == T.Get("color.tertiary"), "别名 warn 同对象")
 check(T.Get("color.danger") == T.Get("color.error"), "别名 danger 同对象")
 check(T.Get("font.normal").size == 13 and T.Get("font.normal").file == nil, "旧字体 token 语义保持")
 check(T.Get("border.size") == 1 and T.Get("spacing.medium") == 8
-    and T.Get("size.cornerRadius") == 4 and T.Get("opacity.panel") == 0.95, "旧数值 token 保持")
+    and T.Get("size.cornerRadius") == 4 and T.Get("opacity.panel") == 0.88, "旧数值 token 保持")
 check(T.Get("no.such") == nil, "未知 token 返回 nil")
 
 print("== S2 七套配色与迁移（步骤 2）==")
@@ -191,7 +191,7 @@ local panel = W.Panel(parent)
 local panelBg = panel.textures[1]
 local sc = T.Get("color.surface-container")
 check(panelBg.r == sc[1] and panelBg.g == sc[2] and panelBg.b == sc[3]
-    and panelBg.a == 0.95, "Panel 背景 = surface-container × opacity.panel")
+    and panelBg.a == 0.88, "Panel 背景 = surface-container × opacity.panel")
 local button = W.Button(parent, "OK")
 local btnOverlay = button.textures[2]
 check(button.fonts[1].text == "OK", "Button 标签文本")

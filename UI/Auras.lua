@@ -44,11 +44,12 @@ local function collect(kind)
     return list
 end
 
-local function buildRow(kind, anchor)
+local function buildRow(kind, point)
     local frame = CreateFrame("Frame", "OpenUI" .. kind .. "Row", UIParent)
     frame:SetSize(MAX_ICONS * (ICON_SIZE + ICON_GAP), ICON_SIZE)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, anchor)
+    frame:SetPoint(point[1], UIParent, point[2], point[3], point[4])
     frame:Hide()
+    Widgets.MakeDraggable(frame, "auras", kind, point)
     local borderColor = kind == "Buff" and "color.outline" or "color.error"
     local slots = {}
     for i = 1, MAX_ICONS do
@@ -66,7 +67,7 @@ local function buildRow(kind, anchor)
         timeText:SetPoint("TOP", button, "BOTTOM", 0, 0)
         local bc = Theme.Get(borderColor)
         border:SetColorTexture(bc[1], bc[2], bc[3], 0.8)
-        slots[i] = { button = button, icon = icon, count = count, time = timeText }
+        slots[i] = { button = button, icon = icon, count = count, time = timeText, border = border }
     end
     rows[kind] = { frame = frame, slots = slots, list = {} }
 end
@@ -74,8 +75,8 @@ end
 local function build()
     if built then return end
     built = true
-    buildRow("Buff", 230)
-    buildRow("Debuff", 195)
+    buildRow("Buff", { "TOPRIGHT", "TOPRIGHT", -20, -8 })
+    buildRow("Debuff", { "TOPRIGHT", "TOPRIGHT", -20, -44 })
 end
 
 local function formatRemain(seconds)
@@ -117,6 +118,22 @@ function Auras.UpdateAll()
     updateRow("Buff")
     updateRow("Debuff")
 end
+
+-- #50：配色切换后重绘槽位描边
+function Auras.ApplyTheme()
+    if not built then return end
+    for kind, row in pairs(rows) do
+        local token = kind == "Buff" and "color.outline" or "color.error"
+        local color = Theme.Get(token)
+        for _, slot in ipairs(row.slots) do
+            if slot.border and color then
+                slot.border:SetColorTexture(color[1], color[2], color[3], 0.8)
+            end
+        end
+    end
+end
+
+if Theme.RegisterRefresh then Theme.RegisterRefresh(Auras.ApplyTheme) end
 
 function Auras.OnEnable()
     build()

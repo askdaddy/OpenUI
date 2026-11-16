@@ -97,7 +97,7 @@ for _, tok in ipairs(tokens) do
 end
 check(allResolved, "全部 token Get 非 nil")
 check(colorEq(T.Get("color.bg"), { 0.068, 0.0755, 0.082, 1 }), "color.bg 别名=starblue surface 实测值逐元素相等（#7 基线）")
-check(T.Get("opacity.panel") == 0.95, "opacity.panel == 0.95")
+check(T.Get("opacity.panel") == 0.88, "opacity.panel == 0.88")
 check(type(T.Get("font.normal")) == "table" and T.Get("font.normal").size == 13
     and T.Get("font.normal").file == nil, "font.normal size=13 且 file 为 nil")
 check(T.Get("border.size") == 1, "border.size == 1")
@@ -111,9 +111,9 @@ local ok1 = T.Set("opacity.panel", 0.5)
 check(ok1 == true and T.Get("opacity.panel") == 0.5
     and _G.OpenUIDB.theme["opacity.panel"] == 0.5, "Set 后生效值与 OpenUIDB.theme 同步为 0.5")
 T.Reset("opacity.panel")
-check(T.Get("opacity.panel") == 0.95 and _G.OpenUIDB.theme["opacity.panel"] == nil,
-    "Reset 后回预设 0.95 且 DB 键清除")
-check(T.Set("opacity.panel", 5) == false and T.Get("opacity.panel") == 0.95,
+check(T.Get("opacity.panel") == 0.88 and _G.OpenUIDB.theme["opacity.panel"] == nil,
+    "Reset 后回预设 0.88 且 DB 键清除")
+check(T.Set("opacity.panel", 5) == false and T.Get("opacity.panel") == 0.88,
     "越界值 Set 返回 false 且值不变")
 check(diagnoseHas("Theme") and diagnoseHas("opacity.panel"),
     "软失败进诊断队列（含 Theme 归属与 token 名）")
@@ -151,7 +151,7 @@ frame.scripts.OnEvent(frame, "ADDON_LOADED", "OpenUI")
 check(T.Get("opacity.panel") == 0.7, "DB 合法定制值经 OnInitialize 生效")
 _G.OpenUIDB = { configVersion = 1, theme = { ["opacity.panel"] = "abc" } }
 frame.scripts.OnEvent(frame, "ADDON_LOADED", "OpenUI")
-check(T.Get("opacity.panel") == 0.95, "DB 非法值回预设")
+check(T.Get("opacity.panel") == 0.88, "DB 非法值回预设")
 check(_G.OpenUIDB.theme["opacity.panel"] == "abc", "DB 非法值不被清洗")
 check(diagnoseHas("opacity.panel"), "非法值进诊断队列")
 
