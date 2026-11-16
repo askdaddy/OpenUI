@@ -6,6 +6,11 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 布局网格系统（#52）：
+  - Grid 模块（默认关闭）：全屏 1px 网格线（outline-variant×0.15）+ 中心十字轴线（2px×0.25），单元格 32/48/64 可切换（默认 48），按屏幕尺寸生成、随配色主题刷新；
+  - 入口：`/openui grid` 切换；主控面板「基础」类「布局网格」模块小窗（显示/尺寸循环/吸附开关/提示）；
+  - 吸附定位：`Widgets.MakeDraggable` 拖拽结束时按最近网格取整（网格显示且吸附开启时），保存吸附后坐标并即时重锚；
+  - 配置 `cfg.grid = { shown, size, snap }` 持久化；8 个新双语 key（74/74）。（#52）
 - UI 拖拽统一与视觉 v2（#50）：新增 `Widgets.MakeDraggable`（Alt+左键，脱战，位置持久化到生效配置档）并接入单位框体/施法条/光环/宠物条（含宠物按钮 Alt 转发）；单位框体默认移至左上、施法条/光环重排避让屏幕中心；`Theme.RegisterRefresh` 订阅——UnitFrames/CastBars/Auras 底纹与描边随配色重绘；`opacity.panel` 默认 0.95→**0.88**（可见半透明），面板 sheen 渐变增强 0.35→0 与 24px 亮带降级、边框 alpha 面板 0.9/按钮 0.7。（#50）
 - 系统 UI 遮盖机制（#49）：Native 助手升级——保存模块声明的帧名清单（含未加载帧），ADDON_LOADED/PLAYER_ENTERING_WORLD/脱战自动重应用（延迟加载的暴雪帧出现即隐藏）；动作条迁移至 Native 并覆盖 MainMenuBar+MultiBar×7+PetActionBar，光环补 DebuffFrame；每模块独立记账、恢复幂等；`OpenUI.Native.Snapshot()` 供 `/openui probe` 查看隐藏清单。（#49）
 - UI 基础美化（#48）：全部 Widgets.Panel 与 Button/Toggle 增加 **1px 细边框**（outline-variant，面板 0.85 / 按钮 0.6）与面板**顶部 sheen 渐变**（surface-container-highest 0.12→0，SetGradient 可用时）；半透明基色保持；配色切换时装饰随 Refresh 换色；缺失 CreateColor/SetGradient 自动降级零报错。（#48）

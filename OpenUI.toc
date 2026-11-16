@@ -20,6 +20,7 @@ UI\Widgets.lua
 UI\Settings.lua
 UI\Diagnostics.lua
 UI\ActionBars.lua
+UI\Grid.lua
 UI\Chat.lua
 UI\Native.lua
 UI\UnitFrames.lua
