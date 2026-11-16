@@ -112,7 +112,7 @@ local order = {
     "Init.lua", "Locales/enUS.lua", "Locales/zhCN.lua", "Config/Defaults.lua",
     "Core/Core.lua", "Core/Resources.lua", "Core/Slash.lua", "Config/Profile.lua",
     "Locales/Manager.lua", "UI/Theme.lua", "UI/Widgets.lua", "UI/Settings.lua",
-    "UI/Diagnostics.lua", "UI/ActionBars.lua",
+    "UI/Diagnostics.lua", "UI/Native.lua", "UI/ActionBars.lua",
 }
 for _, file in ipairs(order) do
     assert(loadfile(("%s/%s"):format(ADDON, file)))("OpenUI", ns)
