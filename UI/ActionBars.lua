@@ -374,9 +374,16 @@ local function registerSettingsPanel()
     })
 end
 
+local function tryLoadBlizzardActionBar()
+    if type(LoadAddOn) == "function" then
+        pcall(LoadAddOn, "Blizzard_ActionBar")
+    end
+end
+
 function ActionBars.OnEnable()
     build()
     registerEvents()
+    tryLoadBlizzardActionBar()
     applyBarVisibility()
     if petBar then petBar:Show() end
     refreshAll()
