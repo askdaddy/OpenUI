@@ -69,6 +69,9 @@ local zhCN = {
     SETTINGS_MODULE_NO_OPTIONS = "暂无设置项，可在此启用或停用。",
     SETTINGS_DIAG_OPEN = "打开诊断窗口",
     SETTINGS_MEDIA_INFO = "使用 OpenUI: 前缀注册媒体；装有 LSM 时自动桥接。",
+    SETTINGS_BAR_MAIN = "主条",
+    SETTINGS_BAR_N = "动作条 %d",
+    SETTINGS_ACTIONBARS_HINT = "Alt+左键拖动动作条（脱战）。",
     -- 诊断窗口（#10）
     DIAG_TITLE = "OpenUI 诊断",
     DIAG_COPY_HINT = "选中文本后按 Ctrl+C 复制。",

@@ -1,30 +1,45 @@
--- 动作条 T1（#11）：主条（12 安全按钮 + 安全分页 1–6）+ 宠物条（10 安全按钮）。
--- 动作执行由 SecureActionButtonTemplate 属性驱动（保留原操作能力）；
--- 原生主条/宠物条隐藏仅在脱战应用（战斗中经 #6 PLAYER_REGEN_ENABLED 延后）。
--- 多动作条/姿态/载具/额外动作保持原生（T1 分期），OnDisable 全部恢复原生。
+-- 动作条 T1/T2（#11/#47）：主条（安全分页 1–6）+ bar2–bar6（固定槽 13–72）+ 宠物条。
+-- 动作执行由 SecureActionButtonTemplate 属性驱动；原生条隐藏仅脱战应用（#6 意图队列）。
+-- 每条独立显示开关与位置（Alt+左键或条体拖拽，脱战；持久化到生效配置档）。
+-- OnDisable 全部恢复原生。
 
 local _, ns = ...
 local OpenUI = ns.OpenUI
 local Theme = OpenUI.Theme
 
-local MAIN_SLOTS = 12
+local SLOTS_PER_BAR = 12
 local PET_SLOTS = 10
 local BUTTON_SIZE = 36
 local BUTTON_GAP = 2
+local STEP = BUTTON_SIZE + BUTTON_GAP + 2
+
+-- bar1 走安全分页（槽 1–12，页 2–6 由状态驱动映射到 13–72）；bar2–6 固定槽段。
+local BAR_DEFS = {
+    { key = "bar1", frame = "OpenUIActionBar", offset = 0, pageable = true, defaultShown = true },
+    { key = "bar2", frame = "OpenUIBar2", offset = 12, defaultShown = false },
+    { key = "bar3", frame = "OpenUIBar3", offset = 24, defaultShown = false },
+    { key = "bar4", frame = "OpenUIBar4", offset = 36, defaultShown = false },
+    { key = "bar5", frame = "OpenUIBar5", offset = 48, defaultShown = false },
+    { key = "bar6", frame = "OpenUIBar6", offset = 60, defaultShown = false },
+}
 
 local ActionBars = {}
-local mainBar, petBar, nativeHider
-local mainButtons, petButtons = {}, {}
+local bars = {} -- key -> { frame, buttons = {}, def }
+local petBar, nativeHider
+local petButtons = {}
 local built = false
 local eventsRegistered = false
 local pendingNativeHide = false
 
-local NATIVE_BARS = { "MainMenuBar", "PetActionBar" }
+local NATIVE_BARS = {
+    "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
+    "MultiBarLeft", "MultiBarRight", "MultiBar5", "MultiBar6", "MultiBar7",
+    "PetActionBar",
+}
 
 local PAGE_DRIVER = "[bonusbar:5] 6; [bonusbar:4] 5; [bonusbar:3] 4; [bonusbar:2] 3; "
     .. "[bonusbar:1] 2; [bar:1] 1; [bar:2] 2; [bar:3] 3; [bar:4] 4; [bar:5] 5; [bar:6] 6; 1"
 
--- 安全环境片段：按页把 12 个子按钮的 action 属性指向 (page-1)*12+i（战斗中同样生效）。
 local PAGE_SNIPPET = [[
     local page = tonumber(newstate) or 1
     for i = 1, 12 do
@@ -34,6 +49,23 @@ local PAGE_SNIPPET = [[
         end
     end
 ]]
+
+-- 生效配置（Profile 语义；未加载时回退 legacy）
+local function activeConfig()
+    if OpenUI.Profile and OpenUI.Profile.Config then
+        local cfg = OpenUI.Profile.Config()
+        if type(cfg) == "table" then return cfg end
+    end
+    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
+    return _G.OpenUIDB
+end
+
+local function barConfig(key)
+    local cfg = activeConfig()
+    if type(cfg.actionbars) ~= "table" then cfg.actionbars = {} end
+    if type(cfg.actionbars[key]) ~= "table" then cfg.actionbars[key] = {} end
+    return cfg.actionbars[key]
+end
 
 local function skinButton(button)
     local bg = button:CreateTexture(nil, "BACKGROUND")
@@ -100,11 +132,25 @@ local function refreshPetButton(button, slot)
 end
 
 local function refreshMainIcons()
-    if #mainButtons == 0 then return end
+    local bar = bars.bar1
+    if not bar or #bar.buttons == 0 then return end
     local page = 1
     if type(GetActionBarPage) == "function" then page = GetActionBarPage() or 1 end
-    for i = 1, MAIN_SLOTS do
-        refreshActionButton(mainButtons[i], (page - 1) * MAIN_SLOTS + i)
+    for i = 1, SLOTS_PER_BAR do
+        refreshActionButton(bar.buttons[i], (page - 1) * SLOTS_PER_BAR + i)
+    end
+end
+
+local function refreshFixedBars()
+    for _, def in ipairs(BAR_DEFS) do
+        if not def.pageable then
+            local bar = bars[def.key]
+            if bar then
+                for i = 1, SLOTS_PER_BAR do
+                    refreshActionButton(bar.buttons[i], def.offset + i)
+                end
+            end
+        end
     end
 end
 
@@ -116,81 +162,95 @@ end
 
 local function refreshAll()
     refreshMainIcons()
+    refreshFixedBars()
     refreshPetIcons()
 end
 
--- 生效配置（#13 引入的 Profile 语义）：动作条位置存当前配置档。
-local function activeConfig()
-    if OpenUI.Profile and OpenUI.Profile.Config then
-        local cfg = OpenUI.Profile.Config()
-        if type(cfg) == "table" then return cfg end
-    end
-    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
-    return _G.OpenUIDB
+local function savePosition(key)
+    local bar = bars[key]
+    if not bar or type(bar.frame.GetLeft) ~= "function" then return end
+    local cfg = barConfig(key)
+    cfg.x = bar.frame:GetLeft()
+    cfg.y = bar.frame:GetBottom()
 end
 
-local function savePosition()
-    if not mainBar or type(mainBar.GetLeft) ~= "function" then return end
-    local cfg = activeConfig()
-    if type(cfg.actionbars) ~= "table" then cfg.actionbars = {} end
-    cfg.actionbars.x = mainBar:GetLeft()
-    cfg.actionbars.y = mainBar:GetBottom()
+local function restorePosition(key)
+    local bar = bars[key]
+    if not bar then return end
+    local cfg = barConfig(key)
+    if type(bar.frame.ClearAllPoints) == "function" then bar.frame:ClearAllPoints() end
+    bar.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", cfg.x or 0, cfg.y or 24)
 end
 
-local function restorePosition()
-    local cfg = activeConfig()
-    local pos = type(cfg.actionbars) == "table" and cfg.actionbars or {}
-    if type(mainBar.ClearAllPoints) == "function" then mainBar:ClearAllPoints() end
-    mainBar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", pos.x or 0, pos.y or 24)
-end
-
-local function buildMainBar()
-    mainBar = CreateFrame("Frame", "OpenUIActionBar", UIParent, "SecureHandlerStateTemplate")
-    mainBar:SetSize(MAIN_SLOTS * (BUTTON_SIZE + BUTTON_GAP), BUTTON_SIZE)
-    restorePosition()
-    mainBar:SetMovable(true)
-    mainBar:EnableMouse(true)
-    mainBar:RegisterForDrag("LeftButton")
-    mainBar:SetScript("OnDragStart", function(self)
+local function attachDrag(frame, key, buttons)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
         if OpenUI:CanModifyNow() then self:StartMoving() end
     end)
-    mainBar:SetScript("OnDragStop", function(self)
+    frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        savePosition()
+        savePosition(key)
     end)
-    for i = 1, MAIN_SLOTS do
-        local button = CreateFrame("Button", nil, mainBar, "SecureActionButtonTemplate")
-        button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-        button:SetPoint("LEFT", mainBar, "LEFT", (i - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
-        button:RegisterForClicks("AnyUp")
-        button:SetAttribute("type", "action")
-        button:SetAttribute("action", i)
-        -- Alt+左键拖拽：从任意按钮也能移动整条（脱战；避免与施法点击冲突）
+    for _, button in ipairs(buttons) do
         if type(button.RegisterForDrag) == "function" then
             button:RegisterForDrag("LeftButton")
             button:SetScript("OnDragStart", function()
                 local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
-                if alt and OpenUI:CanModifyNow() then mainBar:StartMoving() end
+                if alt and OpenUI:CanModifyNow() then frame:StartMoving() end
             end)
             button:SetScript("OnDragStop", function()
-                mainBar:StopMovingOrSizing()
-                savePosition()
+                frame:StopMovingOrSizing()
+                savePosition(key)
             end)
         end
+    end
+end
+
+local function buildBar(def)
+    local frame
+    if def.pageable then
+        frame = CreateFrame("Frame", def.frame, UIParent, "SecureHandlerStateTemplate")
+    else
+        frame = CreateFrame("Frame", def.frame, UIParent)
+    end
+    frame:SetSize(SLOTS_PER_BAR * (BUTTON_SIZE + BUTTON_GAP), BUTTON_SIZE)
+    local buttons = {}
+    for i = 1, SLOTS_PER_BAR do
+        local button = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate")
+        button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
+        button:SetPoint("LEFT", frame, "LEFT", (i - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+        button:RegisterForClicks("AnyUp")
+        button:SetAttribute("type", "action")
+        button:SetAttribute("action", def.offset + i)
         skinButton(button)
-        mainBar:SetFrameRef("button" .. i, button)
-        mainButtons[i] = button
+        if def.pageable then
+            frame:SetFrameRef("button" .. i, button)
+        end
+        buttons[i] = button
     end
-    mainBar:SetAttribute("_onstate-page", PAGE_SNIPPET)
-    if type(RegisterStateDriver) == "function" then
-        RegisterStateDriver(mainBar, "page", PAGE_DRIVER)
+    if def.pageable then
+        frame:SetAttribute("_onstate-page", PAGE_SNIPPET)
+        if type(RegisterStateDriver) == "function" then
+            RegisterStateDriver(frame, "page", PAGE_DRIVER)
+        end
     end
+    attachDrag(frame, def.key, buttons)
+    bars[def.key] = { frame = frame, buttons = buttons, def = def }
+    restorePosition(def.key)
+    return bars[def.key]
 end
 
 local function buildPetBar()
     petBar = CreateFrame("Frame", "OpenUIPetBar", UIParent)
     petBar:SetSize(PET_SLOTS * (BUTTON_SIZE + BUTTON_GAP), BUTTON_SIZE)
-    petBar:SetPoint("BOTTOM", mainBar, "TOP", 0, BUTTON_GAP * 3)
+    local mainFrame = bars.bar1 and bars.bar1.frame
+    if mainFrame then
+        petBar:SetPoint("BOTTOM", mainFrame, "TOP", 0, BUTTON_GAP * 3)
+    else
+        petBar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 64)
+    end
     for i = 1, PET_SLOTS do
         local button = CreateFrame("Button", nil, petBar, "SecureActionButtonTemplate")
         button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
@@ -206,8 +266,22 @@ end
 local function build()
     if built then return end
     built = true
-    buildMainBar()
+    for _, def in ipairs(BAR_DEFS) do
+        buildBar(def)
+    end
     buildPetBar()
+end
+
+local function applyBarVisibility()
+    for _, def in ipairs(BAR_DEFS) do
+        local bar = bars[def.key]
+        if bar then
+            local cfg = barConfig(def.key)
+            local shown = cfg.shown
+            if shown == nil then shown = def.defaultShown end
+            if shown then bar.frame:Show() else bar.frame:Hide() end
+        end
+    end
 end
 
 local function hideNative()
@@ -216,7 +290,7 @@ local function hideNative()
         nativeHider:Hide()
     end
     if not OpenUI:CanModifyNow() then
-        pendingNativeHide = true -- 战斗中登记，脱战应用
+        pendingNativeHide = true
         return
     end
     pendingNativeHide = false
@@ -247,45 +321,87 @@ local function registerEvents()
     local own = OpenUI.Own("ActionBars")
     own:On("PLAYER_ENTERING_WORLD", refreshAll)
     own:On("ACTIONBAR_SLOT_CHANGED", refreshAll)
-    own:On("ACTIONBAR_UPDATE_STATE", refreshMainIcons)
-    own:On("ACTIONBAR_PAGE_CHANGED", refreshMainIcons)
+    own:On("ACTIONBAR_UPDATE_STATE", refreshAll)
+    own:On("ACTIONBAR_PAGE_CHANGED", refreshAll)
     own:On("PET_BAR_UPDATE", refreshPetIcons)
     own:On("PLAYER_REGEN_ENABLED", function()
         if pendingNativeHide then hideNative() end
     end)
 end
 
+-- 设置面板模块小窗：各 bar 显示开关（#47）
+local function registerSettingsPanel()
+    if type(OpenUI.Settings) ~= "table" or type(OpenUI.Settings.RegisterModulePanel) ~= "function" then
+        return
+    end
+    OpenUI.Settings.RegisterModulePanel("ActionBars", {
+        build = function(host)
+            local L = OpenUI.L
+            local Widgets = OpenUI.Widgets
+            local y = -2
+            for index, def in ipairs(BAR_DEFS) do
+                local key = def.key
+                local label = def.pageable and L.SETTINGS_BAR_MAIN or L.SETTINGS_BAR_N:format(index)
+                local toggle = Widgets.Toggle(host, label,
+                    function()
+                        local cfg = barConfig(key)
+                        local shown = cfg.shown
+                        if shown == nil then shown = def.defaultShown end
+                        return shown
+                    end,
+                    function(want)
+                        barConfig(key).shown = want and true or false
+                        applyBarVisibility()
+                    end)
+                toggle:SetPoint("TOPLEFT", host, "TOPLEFT", 0, y)
+                toggle:SetSize(220, 24)
+                y = y - 28
+            end
+            local hint = Widgets.Text(host, L.SETTINGS_ACTIONBARS_HINT, "body")
+            hint:SetPoint("TOPLEFT", host, "TOPLEFT", 0, y - 4)
+            hint:SetWidth(340)
+        end,
+    })
+end
+
 function ActionBars.OnEnable()
     build()
     registerEvents()
-    if mainBar then mainBar:Show() end
+    applyBarVisibility()
     if petBar then petBar:Show() end
     refreshAll()
     hideNative()
 end
 
 function ActionBars.OnDisable()
-    eventsRegistered = false -- #6 Release 已移除名下事件；重建时重新登记
+    eventsRegistered = false
     pendingNativeHide = false
-    if mainBar then mainBar:Hide() end
+    for _, def in ipairs(BAR_DEFS) do
+        local bar = bars[def.key]
+        if bar then bar.frame:Hide() end
+    end
     if petBar then petBar:Hide() end
     restoreNative()
 end
 
--- 导出给测试/诊断（只读用途）
-ActionBars.MainBar = function() return mainBar end
+-- 兼容 API（#11 测试与消费者）
+ActionBars.MainBar = function() return bars.bar1 and bars.bar1.frame end
+ActionBars.MainButtons = function() return bars.bar1 and bars.bar1.buttons or {} end
 ActionBars.PetBar = function() return petBar end
-ActionBars.MainButtons = function() return mainButtons end
 ActionBars.PetButtons = function() return petButtons end
+ActionBars.Bar = function(key) return bars[key] end
+ActionBars.BarKeys = function()
+    local list = {}
+    for _, def in ipairs(BAR_DEFS) do list[#list + 1] = def.key end
+    return list
+end
 ActionBars.PageDriver = PAGE_DRIVER
 
 OpenUI.ActionBars = ActionBars
 
 OpenUI:RegisterModule("ActionBars", {
-    OnEnable = function()
-        ActionBars.OnEnable()
-    end,
-    OnDisable = function()
-        ActionBars.OnDisable()
-    end,
+    OnEnable = function() ActionBars.OnEnable() end,
+    OnDisable = function() ActionBars.OnDisable() end,
 })
+
+registerSettingsPanel()
