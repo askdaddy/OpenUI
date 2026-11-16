@@ -69,7 +69,17 @@ local function startListening()
         reapplyAll()
     end)
     own:On("ADDON_LOADED", function() reapplyAll() end)
-    own:On("PLAYER_ENTERING_WORLD", function() reapplyAll() end)
+    own:On("PLAYER_ENTERING_WORLD", function()
+        reapplyAll()
+        -- #57：暴雪 UI 在大厅初始化/重挂后可能重新显示动作条——登录后延迟重试
+        if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+            for _, delay in ipairs({ 1, 3, 6 }) do
+                C_Timer.After(delay, function()
+                    if next(records) ~= nil then reapplyAll() end
+                end)
+            end
+        end
+    end)
 end
 
 local function namesToFrames(names)
