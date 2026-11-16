@@ -361,6 +361,7 @@ end
 -- ==== 公共 API ====
 function Settings.OpenModule(moduleName)
     if not OpenUI.modules[moduleName] then return end
+    build()
     currentModule = moduleName
     clearModuleHost()
     buildModuleHost()

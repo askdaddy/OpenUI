@@ -69,6 +69,9 @@ local enUS = {
     SETTINGS_MODULE_NO_OPTIONS = "No options yet. Enable or disable this module here.",
     SETTINGS_DIAG_OPEN = "Open diagnostics",
     SETTINGS_MEDIA_INFO = "Register media with the OpenUI: prefix; bridges to LSM when present.",
+    SETTINGS_BAR_MAIN = "Main Bar",
+    SETTINGS_BAR_N = "Bar %d",
+    SETTINGS_ACTIONBARS_HINT = "Alt+Left drag to move bars (out of combat).",
     -- 诊断窗口（#10）
     DIAG_TITLE = "OpenUI Diagnostics",
     DIAG_COPY_HINT = "Select the text and press Ctrl+C to copy.",
