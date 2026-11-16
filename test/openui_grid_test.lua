@@ -10,7 +10,7 @@ function GetLocale() return "enUS" end
 function UnitFullName() return "Seven" end
 function GetRealmName() return "Forever" end
 local frames = {}
-local function mktex() local t={} function t:SetPoint() end function t:SetAllPoints() end function t:SetColorTexture(r,g,b,a) self.r,self.g,self.b=r,g,b end function t:SetAlpha() end function t:SetTexture(x) self.texture=x end function t:SetSize(w,h) self.w=w self.h=h end function t:SetHeight() end function t:SetGradient() end function t:Hide() self.hidden=true end function t:Show() self.hidden=false end return t end
+local function mktex() local t={} function t:SetPoint() end function t:SetAllPoints() end function t:SetColorTexture(r,g,b,a) self.r,self.g,self.b,self.a=r,g,b,a end function t:SetAlpha() end function t:SetTexture(x) self.texture=x end function t:SetSize(w,h) self.w=w self.h=h end function t:SetHeight() end function t:SetGradient() end function t:Hide() self.hidden=true end function t:Show() self.hidden=false end return t end
 local function mkfs() local f={shown=true} function f:SetPoint() end function f:SetWidth() end function f:SetText(s) self.text=s end function f:SetTextColor() end function f:SetAlpha() end function f:SetFont() end function f:Show() self.shown=true end function f:Hide() self.shown=false end function f:IsShown() return self.shown end return f end
 local function mkframe(t,name,parent)
   local f={frameType=t,name=name,shown=true,parent=parent,registered={},scripts={},textures={},fonts={},attrs={},refs={},moving=false}
@@ -23,6 +23,7 @@ local function mkframe(t,name,parent)
   function f:StartMoving() self.moving=true end function f:StopMovingOrSizing() self.moving=false end
   function f:Show() self.shown=true end function f:Hide() self.shown=false end function f:IsShown() return self.shown end
   function f:SetFrameStrata() end function f:SetFrameLevel() end
+  function f:SetAlpha(a) self.alpha=a end function f:GetAlpha() return self.alpha or 1 end
   function f:SetAutoFocus() end function f:SetMultiLine() end function f:SetFontObject() end function f:SetTextColor() end function f:SetTextInsets() end
   function f:SetText(s) self.text=s end function f:GetText() return self.text end
   function f:SetAttribute(k,v) self.attrs[k]=v end function f:GetAttribute(k) return self.attrs[k] end
@@ -61,6 +62,7 @@ local Grid = OpenUI.Grid
 local S = OpenUI.Settings
 local Theme = OpenUI.Theme
 local passCount, failCount = 0, 0
+local function tickAll() local snap={} for i,t in ipairs(C_Timer.tickers) do snap[i]=t end for _,t in ipairs(snap) do t:Tick() end end
 local failures = {}
 local function ck(cond, label)
     if cond then passCount = passCount + 1 else failCount = failCount + 1; failures[#failures + 1] = label end
@@ -115,6 +117,33 @@ end
 ck(found, "grid module panel has display toggle")
 OpenUI:DisableModule("Grid")
 ck(not Grid.IsShown(), "disable hides overlay")
+print("== S5 增强：/openui grid <尺寸> 与拖拽淡入淡出 ==")
+local outs = {}
+local savedPrint2 = print
+print = function(...) local parts={} for i=1,select("#",...) do parts[#parts+1]=tostring((select(i,...))) end outs[#outs+1]=table.concat(parts," ") end
+SlashCmdList.OPENUI("grid 8")
+print = savedPrint2
+ck(Grid.GetSize() == 8, "/openui grid 8 sets size 8")
+ck(Grid.IsShown(), "/openui grid 8 shows overlay")
+ck(#outs > 0 and outs[1]:find("8",1,true) ~= nil, "prints size confirmation")
+-- 淡入淡出：拖拽开始 alpha 趋向 1
+local gridFrame
+for _, f in ipairs(frames) do if f.name == "OpenUIGrid" then gridFrame = f end end
+gridFrame.alpha = 0.45
+Grid.NotifyDragStart()
+for i = 1, 10 do tickAll() end
+ck(gridFrame.alpha == 1, "drag start fades to 1.0")
+Grid.NotifyDragEnd()
+for i = 1, 10 do tickAll() end
+ck(math.abs((gridFrame.alpha or 0) - 0.45) < 1e-9, "drag end fades back to 0.45")
+-- 中心轴 primary 高亮
+LocalTheme = Theme
+local primary = Theme.Get("color.primary")
+local centerFound = false
+for _, tex in ipairs(gridFrame.textures) do
+    if tex.r == primary[1] and tex.g == primary[2] and tex.a == 0.35 then centerFound = true end
+end
+ck(centerFound, "center axis uses primary color (0.35)")
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then for _, f in ipairs(failures) do io.stderr:write("FAIL: "..f.."\n") end os.exit(1) end
 os.exit(0)

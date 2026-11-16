@@ -11,6 +11,8 @@ local Widgets = OpenUI.Widgets
 local Grid = {}
 local SIZES = { 32, 48, 64 }
 local DEFAULT_SIZE = 48
+local REST_ALPHA = 0.45
+local fadeTarget, fadeTicker
 
 local frame
 local segmentList = {}
@@ -39,7 +41,7 @@ function Grid.GetSize()
 end
 
 function Grid.SetSize(size)
-    if type(size) ~= "number" or size < 8 or size > 256 then return false end
+    if type(size) ~= "number" or size < 4 or size > 256 then return false end
     gridConfig().size = size
     Grid.Rebuild()
     return true
@@ -84,9 +86,15 @@ end
 
 local function paintSegments()
     local border = Theme.Get("color.outline-variant")
+    local accent = Theme.Get("color.primary")
     for _, seg in ipairs(segmentList) do
-        if border and type(seg.tex.SetColorTexture) == "function" then
-            seg.tex:SetColorTexture(border[1], border[2], border[3], seg.center and 0.25 or 0.15)
+        if type(seg.tex.SetColorTexture) == "function" then
+            if seg.center and accent then
+                -- 中心轴高亮（参照 ElvUI 的红色中线思路，用主题主色）
+                seg.tex:SetColorTexture(accent[1], accent[2], accent[3], 0.35)
+            elseif border then
+                seg.tex:SetColorTexture(border[1], border[2], border[3], 0.15)
+            end
         end
     end
 end
@@ -135,10 +143,49 @@ function Grid.IsShown()
     return frame ~= nil and frame:IsShown()
 end
 
+-- 拖拽淡入淡出（参照 ElvUI Movers 的 UIFrameFadeIn/Out）
+local function fadeTo(target)
+    if not frame or type(frame.SetAlpha) ~= "function" then return end
+    fadeTarget = target
+    local own = OpenUI.Own("Grid")
+    if fadeTicker then
+        if type(fadeTicker.Cancel) == "function" then fadeTicker:Cancel() end
+        fadeTicker = nil
+    end
+    local alpha = (type(frame.GetAlpha) == "function" and frame:GetAlpha()) or REST_ALPHA
+    if math.abs(alpha - target) < 0.02 then
+        frame:SetAlpha(target)
+        return
+    end
+    fadeTicker = own:Every(0.05, function()
+        local current = (type(frame.GetAlpha) == "function" and frame:GetAlpha()) or target
+        local step = (target > current) and 0.15 or -0.15
+        current = current + step
+        if (target > alpha and current >= target) or (target <= alpha and current <= target) then
+            frame:SetAlpha(target)
+            if fadeTicker and type(fadeTicker.Cancel) == "function" then fadeTicker:Cancel() end
+            fadeTicker = nil
+        else
+            frame:SetAlpha(current)
+        end
+    end)
+end
+
+function Grid.NotifyDragStart()
+    if not Grid.IsShown() then return end
+    fadeTo(1)
+end
+
+function Grid.NotifyDragEnd()
+    if not Grid.IsShown() then return end
+    fadeTo(REST_ALPHA)
+end
+
 function Grid.Show()
     buildOverlay()
     if #segmentList == 0 then Grid.Rebuild() end
     frame:Show()
+    if type(frame.SetAlpha) == "function" then frame:SetAlpha(REST_ALPHA) end
     gridConfig().shown = true
 end
 

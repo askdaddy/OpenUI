@@ -16,10 +16,16 @@ SLASH_OPENUI1 = "/openui"
 
 SlashCmdList["OPENUI"] = function(msg)
     msg = strtrim(msg or ""):lower()
-    if msg == "grid" then
+    if msg:match("^grid") then
         if OpenUI.Grid then
-            local shown = OpenUI.Grid.Toggle()
-            print(L.GRID_TOGGLE_HINT:format(shown and L.SETTINGS_GRID_ON or L.SETTINGS_GRID_OFF))
+            local size = tonumber(msg:match("^grid%s+(%d+)$"))
+            if size and OpenUI.Grid.SetSize(size) then
+                OpenUI.Grid.Show()
+                print(L.SETTINGS_GRID_SIZE_FMT:format(size))
+            else
+                local shown = OpenUI.Grid.Toggle()
+                print(L.GRID_TOGGLE_HINT:format(shown and L.SETTINGS_GRID_ON or L.SETTINGS_GRID_OFF))
+            end
         end
         return
     end
