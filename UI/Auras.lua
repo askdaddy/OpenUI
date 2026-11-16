@@ -15,7 +15,7 @@ local built, eventsRegistered = false, false
 local rows = {}
 local ticker
 
-local NATIVE_FRAMES = { "BuffFrame" }
+local NATIVE_FRAMES = { "BuffFrame", "DebuffFrame" }
 
 local function safe(fn, ...)
     if type(fn) == "function" then return fn(...) end
