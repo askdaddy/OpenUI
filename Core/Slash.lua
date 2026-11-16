@@ -16,6 +16,13 @@ SLASH_OPENUI1 = "/openui"
 
 SlashCmdList["OPENUI"] = function(msg)
     msg = strtrim(msg or ""):lower()
+    if msg == "grid" then
+        if OpenUI.Grid then
+            local shown = OpenUI.Grid.Toggle()
+            print(L.GRID_TOGGLE_HINT:format(shown and L.SETTINGS_GRID_ON or L.SETTINGS_GRID_OFF))
+        end
+        return
+    end
     if msg == "probe" then
         -- 现场诊断（#8/#11 验收修复）：窗口/按钮几何与动作槽数据
         local S = OpenUI.Settings

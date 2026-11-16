@@ -27,7 +27,7 @@ local DEFAULT_CATEGORY = "panels"
 
 local MODULE_CATEGORY = {
     Profile = "core", Theme = "core", Locale = "core", Settings = "core",
-    Diagnostics = "core", Media = "core",
+    Diagnostics = "core", Media = "core", Grid = "core",
     ActionBars = "combat", Chat = "combat", UnitFrames = "combat", CastBars = "combat",
     Auras = "combat", Nameplates = "combat", MinimapUI = "combat",
     Tooltips = "panels", Bags = "panels", WorldMapUI = "panels", QuestUI = "panels",
@@ -63,6 +63,7 @@ local MODULE_LABELS = {
     AuctionUI = "SETTINGS_MOD_AUCTIONUI",
     SystemUI = "SETTINGS_MOD_SYSTEMUI",
     SpecialUI = "SETTINGS_MOD_SPECIALUI",
+    Grid = "SETTINGS_MOD_GRID",
 }
 
 local frame, searchBox, noResultsText, hubHost

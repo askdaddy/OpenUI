@@ -34,9 +34,19 @@ function Widgets.MakeDraggable(frame, section, key, point)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         if type(self.GetLeft) ~= "function" then return end
+        local x, y = self:GetLeft(), self:GetBottom()
+        local G = OpenUI.Grid
+        if G and type(G.IsShown) == "function" and G.IsShown() and type(G.Snap) == "function" then
+            local sx, sy = G.Snap(x, y)
+            if type(sx) == "number" and type(sy) == "number" and (sx ~= x or sy ~= y) then
+                if type(self.ClearAllPoints) == "function" then self:ClearAllPoints() end
+                self:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", sx, sy)
+                x, y = sx, sy
+            end
+        end
         local cfg = activeConfig()
         if type(cfg[section]) ~= "table" then cfg[section] = {} end
-        cfg[section][key] = { x = self:GetLeft(), y = self:GetBottom() }
+        cfg[section][key] = { x = x, y = y }
     end)
     local cfg = activeConfig()
     local saved = type(cfg[section]) == "table" and cfg[section][key]

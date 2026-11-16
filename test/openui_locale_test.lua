@@ -91,8 +91,8 @@ local Loc = OpenUI.Locale
 print("== S1 资源表与双语文案（步骤 1）==")
 check(type(OpenUI.Locales) == "table" and type(OpenUI.Locales.enUS) == "table"
     and type(OpenUI.Locales.zhCN) == "table", "Locales.enUS/zhCN 资源表存在")
-check(count(OpenUI.Locales.enUS) == 66, "enUS key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.enUS) .. "）")
-check(count(OpenUI.Locales.zhCN) == 66, "zhCN key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.zhCN) .. "）")
+check(count(OpenUI.Locales.enUS) == 74, "enUS key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.enUS) .. "）")
+check(count(OpenUI.Locales.zhCN) == 74, "zhCN key 计数 = 26（#8/#10 文案；实际 " .. count(OpenUI.Locales.zhCN) .. "）")
 check(L.LOCALE_INVALID:find("%%s") ~= nil and L.LOCALE_INVALID:find("Invalid", 1, true) ~= nil,
     "enUS LOCALE_INVALID 为含 %s 的英文串")
 local zh = OpenUI.Locales.zhCN
