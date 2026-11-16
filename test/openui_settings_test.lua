@@ -1,38 +1,21 @@
--- OpenUI 统一设置窗口黑盒测试（Issue #8 plan 步骤 1–4 冻结验收，QA 独立编写）。
--- 以 WoW API 桩模拟客户端边界（帧/EditBox/状态脚本），按 TOC 次序加载后断言；
--- 不读游戏客户端、不修改业务代码。
--- 运行：lua test/openui_settings_test.lua（仓库任意位置可执行）
+-- OpenUI 主控面板黑盒测试（Issue #46 冻结验收，QA 独立编写；替代 #8 旧交互测试）。
+-- 运行：lua test/openui_settings_test.lua
 
 local HERE = (arg[0]:match("^(.*)[/\\]") or ".")
-local ADDON = HERE .. "/.." -- 包根即仓库根（D54）
+local ADDON = HERE .. "/.."
 
 local ns = {}
-local output = {}
 local passCount, failCount = 0, 0
 local failures = {}
 
--- ==== WoW 环境桩 ====
-function print(...)
-    local parts = {}
-    for i = 1, select("#", ...) do
-        parts[#parts + 1] = tostring((select(i, ...)))
-    end
-    output[#output + 1] = table.concat(parts, " ")
-end
-
-function strtrim(s)
-    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
-end
-
+function print() end
+function strtrim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
 function GetAddOnMetadata(name, field)
-    if name == "OpenUI" and field == "Version" then
-        return "2026.11.0-dev.1"
-    end
+    if name == "OpenUI" and field == "Version" then return "2026.11.0-dev.1" end
 end
-
-function GetLocale()
-    return "enUS"
-end
+function GetLocale() return "enUS" end
+function UnitFullName() return "Seven" end
+function GetRealmName() return "Forever" end
 
 local frames = {}
 local function mktex()
@@ -40,24 +23,27 @@ local function mktex()
     function t:SetPoint() end
     function t:SetAllPoints() end
     function t:SetColorTexture(r, g, b, a) self.r, self.g, self.b, self.a = r, g, b, a end
-    function t:SetAlpha(a) self.alpha = a end
+    function t:SetAlpha() end
+    function t:SetTexture() end
+    function t:SetSize(w, h) self.w, self.h = w, h end
     return t
 end
 local function mkfs()
     local f = { shown = true }
+    function f:SetPoint() end
+    function f:SetWidth() end
     function f:SetText(s) self.text = s end
     function f:SetTextColor() end
     function f:SetAlpha() end
     function f:SetFont() end
-    function f:SetPoint() end
     function f:Show() self.shown = true end
     function f:Hide() self.shown = false end
     function f:IsShown() return self.shown end
     return f
 end
-local function mkframe(frameType, name)
-    local f = { frameType = frameType, name = name, shown = true,
-                registered = {}, scripts = {}, textures = {}, fonts = {} }
+local function mkframe(frameType, name, parent, template)
+    local f = { frameType = frameType, name = name, shown = true, parent = parent,
+                registered = {}, scripts = {}, textures = {}, fonts = {}, attrs = {}, refs = {} }
     function f:RegisterEvent(e) self.registered[e] = true end
     function f:UnregisterEvent(e) self.registered[e] = nil end
     function f:SetScript(n, fn) self.scripts[n] = fn end
@@ -75,177 +61,172 @@ local function mkframe(frameType, name)
     function f:Hide() self.shown = false end
     function f:IsShown() return self.shown end
     function f:SetAutoFocus() end
+    function f:SetMultiLine() end
     function f:SetText(s) self.text = s end
     function f:GetText() return self.text end
+    function f:SetFontObject() end
+    function f:SetTextColor() end
+    function f:SetTextInsets() end
+    function f:SetAttribute(k, v) self.attrs[k] = v end
+    function f:GetAttribute(k) return self.attrs[k] end
+    function f:SetFrameRef(k, v) self.refs[k] = v end
+    function f:RegisterForClicks() end
+    function f:SetParent(p) self.parent = p end
+    function f:GetParent() return self.parent end
+    function f:SetBackdropColor(r, g, b, a) self.bgColor = { r, g, b, a } end
+    function f:GetBackdropColor() return table.unpack(self.bgColor or { 0, 0, 0, 0 }) end
+    function f:SetBackdropBorderColor(r, g, b, a) self.borderColor = { r, g, b, a } end
+    function f:GetBackdropBorderColor() return table.unpack(self.borderColor or { 0, 0, 0, 0 }) end
+    function f:GetFont() return "FRIZQT__.TTF", 14, "" end
+    function f:SetFont(file, size, flags) self.fontFile = file; self.fontSize = size end
     table.insert(frames, f)
     return f
 end
-function CreateFrame(frameType, name) return mkframe(frameType, name) end
-
+local BootFrame = mkframe("Frame")
+function CreateFrame(frameType, name, parent, template) return mkframe(frameType, name, parent, template) end
+UIParent = BootFrame
 UISpecialFrames = {}
 SlashCmdList = {}
 C_Timer = { tickers = {} }
 function C_Timer.NewTicker(interval, fn)
-    local t = { cancelled = false }
+    local t = { interval = interval, fn = fn, cancelled = false }
     function t:Cancel() self.cancelled = true end
+    function t:Tick() if not self.cancelled then self.fn() end end
     table.insert(C_Timer.tickers, t)
     return t
 end
+function GetActionTexture(slot) return "tex" .. slot end
+function GetActionCount(slot) return 1 end
+function GetActionBarPage() return 1 end
+function GetPetActionInfo(slot) return nil, nil, nil end
+function RegisterStateDriver() end
+MainMenuBar = mkframe("Frame", "MainMenuBar", UIParent)
+PetActionBar = mkframe("Frame", "PetActionBar", UIParent)
+NUM_CHAT_WINDOWS = 0
 
--- ==== 断言工具 ====
 local function check(cond, label)
-    if cond then
-        passCount = passCount + 1
-    else
-        failCount = failCount + 1
-        failures[#failures + 1] = label
-    end
+    if cond then passCount = passCount + 1 else failCount = failCount + 1; failures[#failures + 1] = label end
     io.write(("  [%s] %s\n"):format(cond and "PASS" or "FAIL", label))
 end
 
-local function btnBySuffix(suffix)
+local order = {
+    "Init.lua", "Locales/enUS.lua", "Locales/zhCN.lua", "Config/Defaults.lua",
+    "Core/Core.lua", "Core/Resources.lua", "Core/Slash.lua", "Config/Profile.lua",
+    "Locales/Manager.lua", "UI/Theme.lua", "UI/Widgets.lua", "UI/Settings.lua",
+    "UI/Diagnostics.lua", "UI/ActionBars.lua", "UI/Chat.lua", "UI/Native.lua",
+    "UI/UnitFrames.lua", "UI/CastBars.lua", "UI/Auras.lua", "UI/Nameplates.lua",
+    "UI/Restyle.lua", "UI/MinimapUI.lua", "UI/Media.lua",
+}
+for _, file in ipairs(order) do
+    assert(loadfile(("%s/%s"):format(ADDON, file)))("OpenUI", ns)
+end
+
+local OpenUI = ns.OpenUI
+local L = OpenUI.L
+local S = OpenUI.Settings
+local Theme = OpenUI.Theme
+local Loc = OpenUI.Locale
+
+local coreFrame, resFrame
+for _, f in ipairs(frames) do
+    if not coreFrame and f.registered["ADDON_LOADED"] then
+        coreFrame = f
+    elseif coreFrame and not resFrame and f.scripts["OnEvent"] then
+        resFrame = f
+    end
+end
+_G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
+coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
+coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
+
+local function fsByText(text)
     for _, f in ipairs(frames) do
-        if f.frameType == "Button" and f.themedLabel then
-            local t = f.themedLabel.text:gsub("^[●%s]+", "")
-            if t == suffix then return f end
+        for _, fs in ipairs(f.fonts or {}) do
+            if fs.text == text then return fs end
         end
+        for _, tex in ipairs(f.textures or {}) do end
     end
 end
 
-local function btnByExact(text)
+local function buttonByText(text)
     for _, f in ipairs(frames) do
         if f.frameType == "Button" and f.themedLabel and f.themedLabel.text == text then
             return f
         end
     end
-end
-
-local function fsContains(fragment)
     for _, f in ipairs(frames) do
-        for _, fs in ipairs(f.fonts or {}) do
-            if fs.text and fs.text:find(fragment, 1, true) then return fs end
+        if f.frameType == "Button" and f.themedLabel then
+            local t = f.themedLabel.text:gsub("^[●○%s]+", "")
+            if t == text then return f end
         end
     end
 end
 
-local function countType(frameType)
-    local n = 0
-    for _, f in ipairs(frames) do
-        if f.frameType == frameType then n = n + 1 end
+print("== S1 主控总览（步骤 1）==")
+local outBefore = #OpenUI.moduleOrder
+S.Open()
+check(S.IsOpen(), "/openui 打开主控面板")
+check(outBefore > 5, "注册模块数=" .. outBefore)
+local tiles = 0
+for _, module in ipairs(OpenUI.moduleOrder) do
+    if module.name ~= "Core" and S.Tile(module.name) then tiles = tiles + 1 end
+end
+check(tiles == outBefore - 1, "磁贴数=注册模块数-1（" .. tiles .. "/" .. (outBefore - 1) .. "）")
+check(buttonByText("Theme & Widgets") ~= nil, "磁贴显示本地化模块名")
+check(fsByText("Core") ~= nil and fsByText("Combat HUD") ~= nil, "类目标题渲染（Core/Combat HUD）")
+
+print("== S2 模块小窗（步骤 2）==")
+S.OpenModule("Theme")
+check(S.IsModuleWindowShown() and S.CurrentModule() == "Theme", "点击磁贴打开模块小窗")
+check(buttonByText("teal") ~= nil, "Theme 小窗含配色按钮")
+buttonByText("teal").scripts.OnClick()
+check(Theme.GetPalette() == "teal", "小窗内配色即时生效")
+local toggle
+for _, f in ipairs(frames) do
+    if f.frameType == "Button" and f.themedLabel
+        and f.themedLabel.text:find("Enabled: ", 1, true) == 1 then
+        toggle = f
     end
-    return n
 end
+check(toggle ~= nil, "小窗含启用开关")
+toggle.scripts.OnClick()
+check(OpenUI:IsModuleEnabled("Theme") == false, "开关关闭模块生效")
+toggle.scripts.OnClick()
+check(OpenUI:IsModuleEnabled("Theme") == true, "开关重新启用")
+S.OpenModule("Diagnostics")
+check(S.CurrentModule() == "Diagnostics", "切换模块小窗")
+check(buttonByText("Open diagnostics") ~= nil, "诊断模块小窗含打开按钮")
+S.OpenModule("UnitFrames")
+check(fsByText("No options yet. Enable or disable this module here.") ~= nil,
+    "无专属设置模块显示提示")
+S.CloseModule()
+check(not S.IsModuleWindowShown(), "关闭小窗")
 
--- ==== 按 TOC 次序加载（含 Settings） ====
-local order = {
-    "Init.lua",
-    "Locales/enUS.lua",
-    "Locales/zhCN.lua",
-    "Config/Defaults.lua",
-    "Core/Core.lua",
-    "Core/Resources.lua",
-    "Core/Slash.lua",
-    "Locales/Manager.lua",
-    "UI/Theme.lua",
-    "UI/Widgets.lua",
-    "UI/Settings.lua",
-}
-for _, file in ipairs(order) do
-    local chunk = assert(loadfile(("%s/%s"):format(ADDON, file)))
-    chunk("OpenUI", ns)
-end
-
-local OpenUI = ns.OpenUI
-local L = OpenUI.L
-local T = OpenUI.Theme
-local S = OpenUI.Settings
-local Loc = OpenUI.Locale
-
-print("== S1 开窗/打印/单实例/ESC（步骤 2）==")
-output = {}
-SlashCmdList.OPENUI("")
-local win
-for _, f in ipairs(frames) do
-    if f.name == "OpenUISettings" then win = f end
-end
-check(win ~= nil and win:IsShown(), "裸 /openui 打开设置窗口")
-local cmd = table.concat(output, " | ")
-check(cmd:find("2026.11.0-dev.1", 1, true) ~= nil and cmd:find("Core", 1, true) ~= nil,
-    "版本/模块打印保留（Q2）")
-SlashCmdList.OPENUI("")
-local wins = 0
-for _, f in ipairs(frames) do
-    if f.name == "OpenUISettings" then wins = wins + 1 end
-end
-check(wins == 1, "单实例：再次 /openui 不重复创建（" .. wins .. "）")
-check(#UISpecialFrames >= 1 and UISpecialFrames[1] == "OpenUISettings", "ESC 关闭已注册")
-
-print("== S2 导航与页面（步骤 2–3）==")
-local navLabels = { "Appearance", "Language", "Modules", "About" }
-local navFound = 0
-for _, label in ipairs(navLabels) do
-    if btnByExact(label) then navFound = navFound + 1 end
-end
-check(navFound == 4, "左导航 4 页（" .. navFound .. "）")
-check(btnBySuffix("starblue") ~= nil, "外观页渲染 7 套配色按钮")
-local btnBefore = countType("Button")
-btnByExact("Language").scripts.OnClick()
-check(countType("Button") == btnBefore + 3, "语言页切换并渲染 3 个选项")
-
-print("== S3 搜索（步骤 4）==")
+print("== S3 搜索（步骤 3）==")
 local box
 for _, f in ipairs(frames) do
     if f.frameType == "EditBox" then box = f break end
 end
 check(box ~= nil, "搜索框存在")
-box.text = "language"
+box.text = "theme"
 box.scripts.OnTextChanged(box)
-check(btnByExact("Language") ~= nil and btnByExact("Language"):IsShown(), "命中页保留")
-check(btnByExact("Appearance") and not btnByExact("Appearance"):IsShown(), "未命中页隐藏")
+check(S.Tile("Theme").button:IsShown(), "命中磁贴保留")
+check(not S.Tile("Chat").button:IsShown(), "未命中磁贴隐藏")
 box.text = "xyz"
 box.scripts.OnTextChanged(box)
-local anyShown = false
-for _, label in ipairs(navLabels) do
-    local b = btnByExact(label)
-    if b and b:IsShown() then anyShown = true end
-end
-check(not anyShown, "无结果时导航全隐")
-local nr = fsContains("No matching settings.")
-check(nr ~= nil and nr:IsShown(), "无结果提示可见")
+check(not S.Tile("Theme").button:IsShown(), "无结果全部隐藏")
 box.text = ""
 box.scripts.OnTextChanged(box)
-check(btnByExact("Appearance"):IsShown() and btnByExact("About"):IsShown(), "清空恢复全量导航")
-check(nr ~= nil and not nr:IsShown(), "提示随清空隐藏")
+check(S.Tile("Theme").button:IsShown() and S.Tile("Chat").button:IsShown(), "清空恢复")
 
-print("== S4 页面功能即时生效（步骤 3）==")
-btnByExact("Modules").scripts.OnClick()
-btnBySuffix("teal").scripts.OnClick()
-check(T.GetPalette() == "teal", "配色点击即时生效")
-check(btnBySuffix("teal").themedLabel.text:find("●", 1, true) == 1, "当前配色选中标记")
-btnBySuffix("zhCN").scripts.OnClick()
-check(Loc.Get() == "zhCN" and L.VERSION_LINE:find("已加载", 1, true) ~= nil, "语言点击即时生效")
-check(fsContains("OpenUI 设置") ~= nil, "窗口文案随语言刷新")
-local toggle
-for _, f in ipairs(frames) do
-    if f.frameType == "Button" and f.themedLabel
-        and f.themedLabel.text:find("Theme: ", 1, true) == 1 then
-        toggle = f
-    end
-end
-check(toggle ~= nil, "模块页 Toggle 存在")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == false, "Toggle 关闭模块生效")
-check(fsContains("Theme: 关") ~= nil, "Toggle 文案反映关闭（zhCN）")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == true, "Toggle 重新开启模块")
-btnBySuffix("关于").scripts.OnClick()
-check(fsContains("2026.11.0-dev.1") ~= nil, "关于页含版本串")
+print("== S4 语言切换刷新（步骤 3）==")
+Loc.Set("zhCN")
+check(buttonByText("主题与控件") ~= nil, "磁贴文案随语言刷新")
+check(fsByText("战斗界面") ~= nil, "类目标题随语言刷新")
 
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then
-    for _, f in ipairs(failures) do
-        io.stderr:write("FAIL: " .. f .. "\n")
-    end
+    for _, f in ipairs(failures) do io.stderr:write("FAIL: " .. f .. "\n") end
     os.exit(1)
 end
 os.exit(0)
