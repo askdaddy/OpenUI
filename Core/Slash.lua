@@ -139,6 +139,66 @@ SlashCmdList["OPENUI"] = function(msg)
                     C_Timer.After(20, function() matrix:Hide(); control:Hide() end)
                 end
                 print("layers: BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY all painted red")
+                -- #68 probe v5：Widgets 链路 vs ForeverUI 裸克隆配方 并排对比
+                local compare = CreateFrame("Frame", "OpenUIProbeCompare", UIParent)
+                compare:SetSize(640, 220)
+                compare:SetPoint("CENTER", UIParent, "CENTER", 0, -60)
+                compare:Show()
+
+                local function caption(frame, text, x, y)
+                    local fs = CreateFrame("Frame", nil, frame)
+                    fs:SetSize(10, 10)
+                    fs:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
+                    local label = fs:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                    label:SetPoint("TOPLEFT", fs, "TOPLEFT", 0, 0)
+                    label:SetText(text)
+                    return label
+                end
+
+                -- A：Widgets.Panel
+                local panelA = OpenUI.Widgets.Panel(compare)
+                panelA:SetSize(180, 70)
+                panelA:SetPoint("TOPLEFT", compare, "TOPLEFT", 10, -20)
+                caption(compare, "A widgets", 10, -4)
+
+                -- B：ForeverUI Install.lua Box 逐行复刻（无 Widgets）
+                local boxB = CreateFrame("Frame", nil, compare)
+                boxB:SetSize(180, 70)
+                boxB:SetPoint("TOPLEFT", compare, "TOPLEFT", 210, -20)
+                local fillB = boxB:CreateTexture(nil, "BACKGROUND", nil, -8)
+                fillB:SetAllPoints()
+                fillB:SetColorTexture(0.112, 0.126, 0.138, 0.88)
+                local edgesB = { "top", "bottom", "left", "right" }
+                for _, side in ipairs(edgesB) do
+                    local e = boxB:CreateTexture(nil, "OVERLAY", nil, 7)
+                    e:SetColorTexture(0.408, 0.408, 0.408, 0.95)
+                    if side == "top" then e:SetPoint("TOPLEFT"); e:SetPoint("TOPRIGHT"); e:SetHeight(1)
+                    elseif side == "bottom" then e:SetPoint("BOTTOMLEFT"); e:SetPoint("BOTTOMRIGHT"); e:SetHeight(1)
+                    elseif side == "left" then e:SetPoint("TOPLEFT"); e:SetPoint("BOTTOMLEFT"); e:SetWidth(1)
+                    else e:SetPoint("TOPRIGHT"); e:SetPoint("BOTTOMRIGHT"); e:SetWidth(1) end
+                end
+                caption(compare, "B raw recipe", 210, -4)
+
+                -- C：裸字体 vs Widgets.Text
+                local bareFs = compare:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                bareFs:SetPoint("TOPLEFT", compare, "TOPLEFT", 10, -110)
+                bareFs:SetText("C raw font 0.917")
+                bareFs:SetTextColor(0.917, 0.920, 0.922, 1)
+
+                local widgetFs = OpenUI.Widgets.Text(compare, "C widgets font 0.917", "body")
+                widgetFs:SetPoint("TOPLEFT", compare, "TOPLEFT", 210, -110)
+
+                -- D：带阴影 vs 不带
+                local shadowFs = compare:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                shadowFs:SetPoint("TOPLEFT", compare, "TOPLEFT", 10, -140)
+                shadowFs:SetText("D raw font + shadow")
+                shadowFs:SetTextColor(0.917, 0.920, 0.922, 1)
+                shadowFs:SetShadowOffset(1, -1)
+                shadowFs:SetShadowColor(0, 0, 0, 0.9)
+
+                if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                    C_Timer.After(25, function() compare:Hide() end)
+                end
 
                 -- 主条帧名扫描
                 local candidates = {}
