@@ -16,6 +16,28 @@ SLASH_OPENUI1 = "/openui"
 
 SlashCmdList["OPENUI"] = function(msg)
     msg = strtrim(msg or ""):lower()
+    if msg == "probe" then
+        -- 现场诊断（#8/#11 验收修复）：窗口/按钮几何与动作槽数据
+        local S = OpenUI.Settings
+        print("probe: GetActionTexture=" .. type(GetActionTexture)
+            .. " GetActionBarPage=" .. type(GetActionBarPage)
+            .. " C_ActionBar=" .. type(C_ActionBar))
+        if S and S.IsOpen then
+            print("settings open=" .. tostring(S.IsOpen()))
+        end
+        if OpenUI.ActionBars then
+            local bar = OpenUI.ActionBars.MainBar()
+            local buttons = OpenUI.ActionBars.MainButtons()
+            if bar and buttons and buttons[1] then
+                print(("actionbar shown=%s buttons=%d"):format(tostring(bar:IsShown()), #buttons))
+                for i = 1, 3 do
+                    local tex = (type(GetActionTexture) == "function") and GetActionTexture(i) or nil
+                    print(("slot %d texture=%s"):format(i, tostring(tex)))
+                end
+            end
+        end
+        return
+    end
     if msg == "errors" then
         local recorded = OpenUI.Diagnose.Errors()
         if #recorded == 0 then

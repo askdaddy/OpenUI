@@ -39,7 +39,8 @@ function Widgets.Panel(parent, opts)
 end
 
 local function buttonApply(self)
-    panelApply(self)
+    setColor(self.bg, "color.surface-container-high", self.moduleName,
+        get("opacity.panel", self.moduleName))
     setColor(self.overlay, "color.on-surface", self.moduleName, self.stateAlpha or 0)
     local fg = get("color.on-surface", self.moduleName)
     if type(fg) == "table" then
@@ -61,6 +62,7 @@ function Widgets.Button(parent, label, opts)
     local overlay = button:CreateTexture(nil, "ARTWORK")
     overlay:SetAllPoints(button)
     local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("CENTER", button, "CENTER", 0, 0)
     fs:SetText(label or "")
     local inst = {
         bg = bg, overlay = overlay, label = fs,
@@ -132,6 +134,7 @@ function Widgets.Toggle(parent, label, getState, setState, opts)
     local overlay = button:CreateTexture(nil, "ARTWORK")
     overlay:SetAllPoints(button)
     local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("CENTER", button, "CENTER", 0, 0)
     local inst = {
         bg = bg, overlay = overlay, label = fs, moduleName = opts.module,
         stateAlpha = 0, disabled = false, apply = buttonApply,

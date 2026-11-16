@@ -53,10 +53,20 @@ local function paintButtonBg(button)
     end
 end
 
+local function actionTexture(slot)
+    if type(GetActionTexture) == "function" then
+        local tex = GetActionTexture(slot)
+        if tex then return tex end
+    end
+    if type(C_ActionBar) == "table" and type(C_ActionBar.GetActionTexture) == "function" then
+        return C_ActionBar.GetActionTexture(slot)
+    end
+    return nil
+end
+
 local function refreshActionButton(button, slot)
     paintButtonBg(button)
-    local texture
-    if type(GetActionTexture) == "function" then texture = GetActionTexture(slot) end
+    local texture = actionTexture(slot)
     button.openuiIcon:SetTexture(texture)
     local count = 0
     if type(GetActionCount) == "function" then count = GetActionCount(slot) or 0 end
