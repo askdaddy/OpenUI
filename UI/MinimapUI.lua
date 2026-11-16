@@ -33,6 +33,8 @@ local function updateCoords()
     end
 end
 
+local SEGMENTS = 36
+
 local function build()
     if built then return end
     local minimap = minimapFrame()
@@ -41,13 +43,23 @@ local function build()
     ring = CreateFrame("Frame", "OpenUIMinimapRing", UIParent)
     ring:SetSize(148, 148)
     ring:SetPoint("CENTER", minimap, "CENTER", 0, 0)
-    local border = ring:CreateTexture(nil, "BACKGROUND")
-    border:SetAllPoints(ring)
+    -- 圆形点环（36 段沿圆周）：方框描边在圆形小地图上会显示成"小方块"，弃用。
     local bc = Theme.Get("color.outline-variant")
-    border:SetColorTexture(bc[1], bc[2], bc[3], 0.9)
+    local radius = 70
+    ring.openuiSegments = {}
+    for i = 1, SEGMENTS do
+        local angle = (i - 1) / SEGMENTS * math.pi * 2
+        local seg = ring:CreateTexture(nil, "ARTWORK")
+        seg:SetSize(2, 6)
+        seg:SetPoint("CENTER", ring, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
+        if type(seg.SetRotation) == "function" then
+            seg:SetRotation(angle)
+        end
+        seg:SetColorTexture(bc[1], bc[2], bc[3], 0.55)
+        ring.openuiSegments[i] = seg
+    end
     coords = Widgets.Text(ring, "", "label")
     coords:SetPoint("BOTTOM", ring, "BOTTOM", 0, -16)
-    ring.openuiBorder = border
 end
 
 function MinimapUI.OnEnable()
