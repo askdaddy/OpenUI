@@ -56,7 +56,7 @@ local function buildRow(kind, point)
         local button = CreateFrame("Button", nil, frame)
         button:SetSize(ICON_SIZE, ICON_SIZE)
         button:SetPoint("LEFT", frame, "LEFT", (i - 1) * (ICON_SIZE + ICON_GAP), 0)
-        local border = button:CreateTexture(nil, "BACKGROUND")
+        local border = button:CreateTexture(nil, "OVERLAY")
         border:SetAllPoints(button)
         local icon = button:CreateTexture(nil, "ARTWORK")
         -- #59：图标全格填充
