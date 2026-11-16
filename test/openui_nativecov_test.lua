@@ -98,6 +98,16 @@ ck(Native.IsTracking("TestC") and not Native.IsTracking("TestA"), "tracking stat
 ck(Native.Hide("TestC", { "Late2" }) == true, "repeat hide idempotent")
 Native.Restore("TestC")
 ck(Late2.parent == UIParent, "final restore")
+print("== S6 未找到帧名诊断（#59）==")
+Native.Hide("Ghost", { "NoSuchFrameZZZ" })
+local found = false
+for _, line in ipairs(Native.Snapshot()) do
+    if line:find("Ghost", 1, true) and line:find("missing=[NoSuchFrameZZZ]", 1, true) then
+        found = true
+    end
+end
+ck(found, "Snapshot 输出 missing=[NoSuchFrameZZZ]（帧名不匹配可诊断）")
+Native.Restore("Ghost")
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then for _, f in ipairs(failures) do io.stderr:write("FAIL: "..f.."\n") end os.exit(1) end
 os.exit(0)
