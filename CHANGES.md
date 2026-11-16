@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 验收修复（#57）：**撤回 Backdrop 方案**（Forever 客户端仅 edgeFile 的 Backdrop 会以白底填充导致面板变浅灰；边框回到 4 边纹理方案，银边效果保留）；原生动作条隐藏加固——登录后 1s/3s/6s 延迟重试（覆盖暴雪大厅初始化后的重挂/重显），`/openui probe` 可查隐藏清单。（#57）
 - 视觉 v4（#56，按用户提供的 ElvUI 效果图对齐）：面板/按钮边框由暗色 outline-variant 提升为**明亮银灰 color.outline**（面板 ×0.95 / 按钮 ×0.8，Backdrop 与纹理同步）；Widgets.Text 统一**黑色阴影**（1,-1，0.9）；面板顶部 28px 亮带叠加 sheen；动作按钮 1px 描边 + 数量阴影；单位框体生命/能量条 1px 暗描边、生命数值**居中覆盖于血条**；施法条进度条描边；光环图标描边 0.9；聊天边框提升 color.outline。（#56）
 - 视觉 v3（#55，按 examples/elvui-16.01 源码方案）：
   - `Widgets.GradientFill`：上亮(×1.35)下暗(×0.55)垂直渐变填充，SetGradient 不可用时降级纯色；
