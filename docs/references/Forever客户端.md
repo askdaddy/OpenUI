@@ -29,3 +29,34 @@
 - 分模块核查容器、动作条、名牌、地图、任务、聊天、窗口与天赋接口。
 - 区分接口存在、参数可用、战斗可用、受保护操作及真实数据可用。
 - 在获准进入实现与测试阶段后，再进行游戏内验证；目前不编写探针代码。
+
+## 2026-11-16 游戏内实测记录（B0+B1 验收期间）
+
+以下为在本机 1.60.1.70888 上通过 `/openui probe` 差分测试与用户截图确证的事实，作为后续实现的硬约束。
+
+### Secret Values 已启用
+
+- `UnitHealth` 等战斗/单位数值在插件（tainted）上下文中为**秘密值**，直接算术或 `string.format` 会抛错：
+  `attempt to perform arithmetic on local 'hp' (a secret number value, while execution tainted by 'OpenUI')`。
+- 对策：所有数值消费路径使用 `OpenUI.Try(fn, fallback)`（pcall 封装）降级，失败时显示空文本/静态条/隐藏槽；秘密字符串（单位名、图标路径）传给 SetText/SetTexture 同样需要 pcall。
+
+### 纹理渲染
+
+- `Texture:SetColorTexture(r,g,b,a)` 四参可用；`SetTexture(WHITE8X8)+SetVertexColor` 亦可用；BACKGROUND/BORDER/ARTWORK/HIGHLIGHT/OVERLAY 各层均可正常着色（五图层红条实证）。
+- `CreateTexture(name, layer, template, subLevel)` 的第四参为子层级；ForeverUI 参考实现使用 `BACKGROUND, nil, -8` 作填充、`OVERLAY, nil, 7` 作描边。
+- **不要使用 SetBackdrop/BackdropTemplate**：仅 edgeFile 的 Backdrop 在客户端会以默认白底填充（参考实现 ForeverUI 亦明确回避）。
+- 1px 边线必须"每边两点锚定 + SetHeight/SetWidth(1)"；用 TOPLEFT/BOTTOMRIGHT 对角锚点构造边线极易生成覆盖整框的薄膜（本项目踩坑记录，见 CHANGES #69）。
+
+### 帧与接口可用性（实测）
+
+- `PlayerFrame`、`TargetFrame`、`MultiBar5/6/7`、`MultiBarBottomLeft/Right`、`MultiBarLeft/Right`、`PetActionBar` 存在且可被重新挂父隐藏。
+- `PlayerCastingBarFrame` 存在（现代命名）；`CastingBarFrame` 不存在。
+- `MainMenuBar` 全局不存在（原生主条使用未定位的帧名；`LoadAddOn("Blizzard_ActionBar")` 无效）。
+- `GetActionTexture(slot)` 返回**文件 ID 数字**（如 133052），可直接传给 `SetTexture`；`GetActionBarPage`、`C_ActionBar` 存在。
+- 界面模块启用时需隐藏对应原生帧；Native 助手按模块记账，并以 ADDON_LOADED / PLAYER_ENTERING_WORLD / 脱战 + 登录后 1s/3s/6s 重试覆盖懒加载与大厅重挂。
+
+### 参考实现（examples/，只读、不提交）
+
+- `examples/elvui-16.01`：网格（`/egrid`、`Grid_Create`）、Movers 拖拽淡入淡出、Backdrop/gloss 纹理方案；
+- `examples/ForeverUI`：面向本客户端的实际实现——BACKGROUND,-8 填充、OVERLAY,7 手绘边线、不用 SetBackdrop、字体/引导线细节；
+- `examples/Ruyi`：位置登记（Mover）与边缘吸附选项，无布局网格。
