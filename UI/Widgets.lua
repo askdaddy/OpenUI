@@ -120,38 +120,8 @@ local function decorate(frame, kind)
         edgeTexture(frame, 0, 0, 1, 0, border, alpha),    -- 左
         edgeTexture(frame, -1, 0, 0, 0, border, alpha),   -- 右
     }
-    local sheen
-    if kind == "panel" then
-        local top = Theme.Get("color.surface-container-highest")
-        if type(CreateColor) == "function" and type(frame.CreateTexture) == "function" then
-            sheen = frame:CreateTexture(nil, "ARTWORK")
-            sheen:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-            sheen:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
-            if type(sheen.SetGradient) == "function" then
-                sheen:SetGradient("VERTICAL",
-                    CreateColor(top[1], top[2], top[3], 0.35),
-                    CreateColor(top[1], top[2], top[3], 0))
-            else
-                -- 降级：顶部 24px 亮带
-                sheen:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -1, -25)
-                if type(sheen.SetHeight) == "function" then sheen:SetHeight(24) end
-                sheen:SetColorTexture(top[1], top[2], top[3], 0.18)
-                sheen.gradientFallback = true
-            end
-        end
-    end
-    local band
-    if kind == "panel" and type(frame.CreateTexture) == "function" then
-        band = frame:CreateTexture(nil, "ARTWORK")
-        band:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-        band:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
-        if type(band.SetHeight) == "function" then band:SetHeight(28) end
-        local top = Theme.Get("color.surface-container-highest")
-        if type(band.SetColorTexture) == "function" then
-            band:SetColorTexture(top[1], top[2], top[3], 0.10)
-        end
-    end
-    decorated[#decorated + 1] = { frame = frame, edges = edges, sheen = sheen, band = band, kind = kind }
+    -- #58：移除通体 sheen 渐变与顶部亮带（Forever 客户端渲染成白纱覆盖深色底）
+    decorated[#decorated + 1] = { frame = frame, edges = edges, kind = kind }
 end
 
 
@@ -164,7 +134,10 @@ end
 local function setColor(texture, token, moduleName, alphaOverride)
     local c = get(token, moduleName)
     if type(c) ~= "table" then return end
-    texture:SetColorTexture(c[1], c[2], c[3], alphaOverride or c[4])
+    local alpha = alphaOverride or c[4]
+    texture:SetColorTexture(c[1], c[2], c[3], alpha)
+    -- #58：记录实际下发的颜色，供 /openui probe 客户端自证
+    texture.openuiLastColor = { c[1], c[2], c[3], alpha }
 end
 
 local function panelApply(self)
@@ -258,6 +231,11 @@ end
 -- Text(parent, text, role?) -> FontString（role 默认 body；file=nil 时继承创建模板字体）
 function Widgets.Text(parent, text, role)
     local fontString = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- #58：显式文字颜色（此前继承 GameFontNormal 的默认金色）
+    local textColor = Theme.Get("color.on-surface")
+    if type(fontString.SetTextColor) == "function" and type(textColor) == "table" then
+        fontString:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
+    end
     if type(fontString.SetShadowOffset) == "function" then
         fontString:SetShadowOffset(1, -1)
         if type(fontString.SetShadowColor) == "function" then
@@ -285,16 +263,6 @@ function Widgets.Refresh()
             if type(edge.SetColorTexture) == "function" then
                 edge:SetColorTexture(border[1], border[2], border[3], alpha)
             end
-        end
-        if d.band and type(d.band.SetColorTexture) == "function" then
-            d.band:SetColorTexture(top[1], top[2], top[3], 0.10)
-        end
-        if d.sheen and d.sheen.gradientFallback and type(d.sheen.SetColorTexture) == "function" then
-            d.sheen:SetColorTexture(top[1], top[2], top[3], 0.18)
-        elseif d.sheen and type(d.sheen.SetGradient) == "function" and type(CreateColor) == "function" then
-            d.sheen:SetGradient("VERTICAL",
-                CreateColor(top[1], top[2], top[3], 0.35),
-                CreateColor(top[1], top[2], top[3], 0))
         end
     end
 end
@@ -357,6 +325,17 @@ end
 
 function Widgets.Movers()
     return movers
+end
+
+-- #58：客户端自证——实例数量与首个面板实际下发颜色
+function Widgets.DebugInfo()
+    local info = "widgets=" .. #instances
+    local first = instances[1]
+    if first and first.bg and first.bg.openuiLastColor then
+        local c = first.bg.openuiLastColor
+        info = info .. (" first-bg=%.3f/%.3f/%.3f/%.2f"):format(c[1], c[2], c[3], c[4])
+    end
+    return info
 end
 
 OpenUI.Widgets = Widgets

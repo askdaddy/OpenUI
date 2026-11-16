@@ -45,6 +45,38 @@ SlashCmdList["OPENUI"] = function(msg)
         if S and S.IsOpen then
             print("settings open=" .. tostring(S.IsOpen()))
         end
+        if OpenUI.Theme then
+            local surf = OpenUI.Theme.Get("color.surface")
+            local onSurf = OpenUI.Theme.Get("color.on-surface")
+            local outline = OpenUI.Theme.Get("color.outline")
+            print(("theme palette=%s surface=%.3f/%.3f/%.3f onSurface=%.3f outline=%.3f opacity=%.2f")
+                :format(tostring(OpenUI.Theme.GetPalette()),
+                    surf and surf[1] or -1, surf and surf[2] or -1, surf and surf[3] or -1,
+                    onSurf and onSurf[1] or -1, outline and outline[1] or -1,
+                    OpenUI.Theme.Get("opacity.panel") or -1))
+        end
+        if OpenUI.Widgets and OpenUI.Widgets.DebugInfo then
+            print(OpenUI.Widgets.DebugInfo())
+        end
+        -- #58：客户端像素自证——两个色块（红=SetColorTexture；绿=WHITE8X8+SetVertexColor），10 秒后自动消失
+        do
+            local swatch = CreateFrame("Frame", "OpenUIProbeSwatch", UIParent)
+            swatch:SetSize(260, 70)
+            swatch:SetPoint("CENTER", UIParent, "CENTER", 0, -260)
+            local red = swatch:CreateTexture(nil, "ARTWORK")
+            red:SetPoint("TOPLEFT", swatch, "TOPLEFT", 0, 0)
+            red:SetSize(120, 60)
+            red:SetColorTexture(1, 0, 0, 1)
+            local green = swatch:CreateTexture(nil, "ARTWORK")
+            green:SetPoint("TOPLEFT", swatch, "TOPLEFT", 140, 0)
+            green:SetSize(120, 60)
+            if red.SetTexture then green:SetTexture("Interface\\Buttons\\WHITE8X8") end
+            if type(green.SetVertexColor) == "function" then green:SetVertexColor(0, 1, 0, 1) end
+            swatch:Show()
+            if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+                C_Timer.After(10, function() swatch:Hide() end)
+            end
+        end
         if OpenUI.Native and OpenUI.Native.Snapshot then
             local snapshot = OpenUI.Native.Snapshot()
             print("native hiding (" .. #snapshot .. "): " .. table.concat(snapshot, " | "))
