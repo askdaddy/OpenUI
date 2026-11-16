@@ -103,7 +103,7 @@ local function buildUnit(point, name)
     if OpenUI.Widgets and OpenUI.Widgets.Edge then
         local dark = { 0, 0, 0 }
         for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-            local t = OpenUI.Widgets.Edge(track, side, dark, 0.7)
+            local t = OpenUI.Widgets.Edge(frame, side, dark, 0.7, track)
             if t then barEdge[#barEdge + 1] = t end
         end
     end

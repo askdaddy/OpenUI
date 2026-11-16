@@ -88,12 +88,12 @@ local function buildUnitFrame(point, label)
     power:SetPoint("TOPLEFT", powerBg, "TOPLEFT", 0, 0)
     power:SetSize(208, 6)
     -- #56/#69：条外 1px 暗描边（四边正确边线）
-    local function barEdges(anchor)
+    local function barEdges(anchorTex)
         local list = {}
         local dark = { 0, 0, 0 }
         if OpenUI.Widgets and OpenUI.Widgets.Edge then
             for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-                local t = OpenUI.Widgets.Edge(anchor, side, dark, 0.7)
+                local t = OpenUI.Widgets.Edge(frame, side, dark, 0.7, anchorTex)
                 if t then list[#list + 1] = t end
             end
         end

@@ -99,27 +99,30 @@ function Widgets.MakeDraggable(frame, section, key, point)
 end
 
 -- #69：1px 边线（每边两点锚定 + SetHeight/SetWidth；修正旧实现"下边"生成全框薄膜的错误）
-function Widgets.Edge(frame, side, color, alpha)
-    if type(frame) ~= "table" or type(color) ~= "table" then return nil end
+function Widgets.Edge(frame, side, color, alpha, anchor)
+    if type(frame) ~= "table" or type(frame.CreateTexture) ~= "function" or type(color) ~= "table" then
+        return nil
+    end
+    anchor = anchor or frame
     local t = frame:CreateTexture(nil, "OVERLAY", nil, 7)
     if type(t.SetColorTexture) == "function" then
         t:SetColorTexture(color[1], color[2], color[3], alpha)
     end
     if side == "top" then
-        t:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-        t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+        t:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
+        t:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
         if type(t.SetHeight) == "function" then t:SetHeight(1) end
     elseif side == "bottom" then
-        t:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
-        t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        t:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", 0, 0)
+        t:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 0, 0)
         if type(t.SetHeight) == "function" then t:SetHeight(1) end
     elseif side == "left" then
-        t:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-        t:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+        t:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
+        t:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", 0, 0)
         if type(t.SetWidth) == "function" then t:SetWidth(1) end
     elseif side == "right" then
-        t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-        t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        t:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
+        t:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 0, 0)
         if type(t.SetWidth) == "function" then t:SetWidth(1) end
     end
     return t
