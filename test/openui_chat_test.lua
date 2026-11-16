@@ -143,9 +143,9 @@ _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 local surf = Theme.Get("color.surface")
-local ov = Theme.Get("color.outline-variant")
+local ov = Theme.Get("color.outline")
 check(eq(ChatFrame1.bgColor, { surf[1], surf[2], surf[3], 0.88 }), "ChatFrame1 背景 = surface × opacity.panel")
-check(eq(ChatFrame1.borderColor, { ov[1], ov[2], ov[3], 1 }), "ChatFrame1 边框 = outline-variant")
+check(eq(ChatFrame1.borderColor, { ov[1], ov[2], ov[3], 0.95 }), "ChatFrame1 边框 = outline")
 check(ChatFrame1.font[1] == "FRIZQT__.TTF" and ChatFrame1.font[2] == 13,
     "字体文件保留、字号 = type.body")
 check(eq(ChatFrame2.bgColor, { surf[1], surf[2], surf[3], 0.88 }),
