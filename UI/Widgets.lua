@@ -10,6 +10,48 @@ local L = OpenUI.L
 local Widgets = {}
 local instances = {}
 
+-- ==== 装饰（#48）：1px 细边框 + 顶部渐亮 sheen + 半透明底 ====
+local function edgeTexture(frame, x1, y1, x2, y2, color, alpha)
+    local t = frame:CreateTexture(nil, "BORDER")
+    if type(t.SetColorTexture) == "function" then
+        t:SetColorTexture(color[1], color[2], color[3], alpha)
+    end
+    t:SetPoint("TOPLEFT", frame, "TOPLEFT", x1, y1)
+    t:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", x2, y2)
+    return t
+end
+
+-- 顶层装饰实例随 Refresh 换色
+local decorated = {}
+
+local function decorate(frame, kind)
+    local border = Theme.Get("color.outline-variant")
+    local alpha = kind == "panel" and 0.85 or 0.6
+    local edges = {
+        edgeTexture(frame, 0, 0, 0, -1, border, alpha),   -- 上
+        edgeTexture(frame, 0, 1, 0, 0, border, alpha),    -- 下
+        edgeTexture(frame, 0, 0, 1, 0, border, alpha),    -- 左
+        edgeTexture(frame, -1, 0, 0, 0, border, alpha),   -- 右
+    }
+    local sheen
+    if kind == "panel" and type(CreateColor) == "function" then
+        sheen = frame:CreateTexture(nil, "ARTWORK")
+        sheen:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+        sheen:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+        if type(sheen.SetGradient) == "function" then
+            local top = Theme.Get("color.surface-container-highest")
+            sheen:SetGradient("VERTICAL",
+                CreateColor(top[1], top[2], top[3], 0.12),
+                CreateColor(top[1], top[2], top[3], 0))
+        else
+            sheen:Hide()
+        end
+    end
+    decorated[#decorated + 1] = { frame = frame, edges = edges, sheen = sheen, kind = kind }
+end
+
+
+
 local function get(token, moduleName)
     if moduleName then return Theme.GetFor(moduleName, token) end
     return Theme.Get(token)
@@ -35,6 +77,7 @@ function Widgets.Panel(parent, opts)
     local inst = { bg = bg, moduleName = opts.module, apply = panelApply }
     instances[#instances + 1] = inst
     inst:apply()
+    decorate(frame, "panel")
     return frame
 end
 
@@ -90,6 +133,7 @@ function Widgets.Button(parent, label, opts)
     end)
     instances[#instances + 1] = inst
     inst:apply()
+    decorate(button, "button")
     -- 运行时切换禁用：门控状态层与文本透明度
     function button:SetThemedEnabled(enabled)
         inst.disabled = not enabled
@@ -121,6 +165,22 @@ end
 function Widgets.Refresh()
     for i = 1, #instances do
         instances[i]:apply()
+    end
+    local border = Theme.Get("color.outline-variant")
+    local top = Theme.Get("color.surface-container-highest")
+    for i = 1, #decorated do
+        local d = decorated[i]
+        local alpha = d.kind == "panel" and 0.85 or 0.6
+        for _, edge in ipairs(d.edges) do
+            if type(edge.SetColorTexture) == "function" then
+                edge:SetColorTexture(border[1], border[2], border[3], alpha)
+            end
+        end
+        if d.sheen and type(d.sheen.SetGradient) == "function" and type(CreateColor) == "function" then
+            d.sheen:SetGradient("VERTICAL",
+                CreateColor(top[1], top[2], top[3], 0.12),
+                CreateColor(top[1], top[2], top[3], 0))
+        end
     end
 end
 
@@ -175,6 +235,7 @@ function Widgets.Toggle(parent, label, getState, setState, opts)
     end)
     instances[#instances + 1] = inst
     inst:apply()
+    decorate(button, "button")
     button.themedLabel = fs
     return button
 end

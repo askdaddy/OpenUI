@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- UI 基础美化（#48）：全部 Widgets.Panel 与 Button/Toggle 增加 **1px 细边框**（outline-variant，面板 0.85 / 按钮 0.6）与面板**顶部 sheen 渐变**（surface-container-highest 0.12→0，SetGradient 可用时）；半透明基色保持；配色切换时装饰随 Refresh 换色；缺失 CreateColor/SetGradient 自动降级零报错。（#48）
 - 动作条 T2（#47）：新增 bar2–bar6（各 12 安全按钮，固定槽 13–72；主条保持安全分页）；每 bar 独立显示开关（默认仅主条）与独立位置（Alt+左键/条体拖拽，脱战，持久化到生效配置档）；原生多动作条全部隐藏与关闭恢复；设置面板「动作条」模块小窗含 6 条开关与拖拽提示；3 个新双语 key（66/66）。（#47）
 - 主控面板（#46）：/openui 改为模块分类总览（基础/战斗界面/系统窗口/工具四类，三列磁贴，●/○ 启停状态点，搜索按模块名/类目过滤）；点击磁贴打开模块独立小窗（单实例，含启用开关与模块专属控件：主题七套配色/语言/诊断入口/媒体说明/无设置提示）；Settings 自注册为模块；33+2 本地化 key（63/63）。（#46）
 - **Secret Values 兼容（Forever 客户端实测能力）**：UnitHealth/CastingInfo/Aura/动作数量等返回值可能为秘密值，受污染执行中算术与格式化会抛错——新增 OpenUI.Try 共享助手，UnitFrames/CastBars/Auras/ActionBars/Nameplates/MinimapUI 全部数值/格式化路径降级保护（不可用时显示空文本/静态条/隐藏槽，不中断模块）（验收修复）。
