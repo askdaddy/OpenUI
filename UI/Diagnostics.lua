@@ -45,6 +45,17 @@ local function build()
     editBox = CreateFrame("EditBox", nil, frame)
     editBox:SetMultiLine(true)
     editBox:SetAutoFocus(false)
+    -- EditBox 无字体对象时不渲染文本（与搜索框同类问题）
+    if type(editBox.SetFontObject) == "function" and type(ChatFontNormal) == "table" then
+        editBox:SetFontObject(ChatFontNormal)
+    end
+    local textColor = Theme.Get("color.on-surface")
+    if type(editBox.SetTextColor) == "function" and type(textColor) == "table" then
+        editBox:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
+    end
+    if type(editBox.SetTextInsets) == "function" then
+        editBox:SetTextInsets(6, 6, 4, 4)
+    end
     editBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -58)
     editBox:SetSize(528, 286)
     editBox:SetText(formatErrors())
