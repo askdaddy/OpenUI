@@ -70,8 +70,8 @@ local function skinButton(button)
     local bg = button:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(button)
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
-    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    -- #59：图标填满格子（无内缩），1px 描边绘制在其上方
+    icon:SetAllPoints(button)
     local count = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
     if type(count.SetShadowOffset) == "function" then

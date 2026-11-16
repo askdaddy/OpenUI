@@ -161,14 +161,25 @@ function Native.ApplyRestore(module)
     return true
 end
 
--- 诊断（/openui probe）：各模块已登记/已隐藏帧清单
+-- 诊断（/openui probe）：各模块已登记/已隐藏帧清单 + 未找到的帧名（帧名不匹配诊断）
 function Native.Snapshot()
     local list = {}
     for module, record in pairs(records) do
-        local names = {}
-        for name in pairs(record.frames) do names[#names + 1] = name end
-        table.sort(names)
-        list[#list + 1] = module .. ": [" .. table.concat(names, ",") .. "]"
+        local hidden, missing = {}, {}
+        for _, name in ipairs(record.names or {}) do
+            if record.frames[name] then
+                hidden[#hidden + 1] = name
+            else
+                missing[#missing + 1] = name
+            end
+        end
+        table.sort(hidden)
+        table.sort(missing)
+        local line = module .. ": hidden=[" .. table.concat(hidden, ",") .. "]"
+        if #missing > 0 then
+            line = line .. " missing=[" .. table.concat(missing, ",") .. "]"
+        end
+        list[#list + 1] = line
     end
     table.sort(list)
     return list
