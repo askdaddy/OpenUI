@@ -105,7 +105,9 @@ local function buildOverlay()
     frame = CreateFrame("Frame", "OpenUIGrid", UIParent)
     frame:SetAllPoints(UIParent)
     frame:Hide()
+    -- #61：全屏网格不得拦截鼠标（聊天文字选中/拖拽等）
     if type(frame.EnableMouse) == "function" then frame:EnableMouse(false) end
+    if type(frame.SetMouseClickEnabled) == "function" then frame:SetMouseClickEnabled(false) end
     if type(frame.SetFrameStrata) == "function" then frame:SetFrameStrata("BACKGROUND") end
 end
 

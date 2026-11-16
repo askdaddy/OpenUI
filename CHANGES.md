@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 原生帧名兼容（#61）：施法条隐藏清单加入现代别名 `PlayerCastingBarFrame`（保留 CastingBarFrame）；动作条启用/脱战/延迟重试时尝试 `LoadAddOn("Blizzard_ActionBar")` 使懒加载帧就绪；Grid 全屏层增加 `SetMouseClickEnabled(false)` 硬化鼠标穿透（排除聊天文字无法选中的可能原因）。（#61）
 - 验收修复（#59）：动作条/宠物条/光环图标**全格填充**（去掉内缩，描边置于图标之上）；`Native.Snapshot` 升级为 `hidden=[…] missing=[…]`——暴露**未找到的原生帧名**（Forever 帧名差异导致隐藏静默失败的诊断关键，/openui probe 可见）。（#59）
 - 验收修复（#58）：Widgets.Text 显式 SetTextColor(on-surface)（消除 GameFontNormal 默认金色表头）；移除通体 sheen 渐变与顶部亮带（客户端渲染成白纱覆盖深色底）；`/openui probe` 增补主题取值、Widgets 下发色自证与双测试色块（红=SetColorTexture / 绿=WHITE8X8+SetVertexColor，10s 自动消失）。（#58）
 - 验收修复（#57）：**撤回 Backdrop 方案**（Forever 客户端仅 edgeFile 的 Backdrop 会以白底填充导致面板变浅灰；边框回到 4 边纹理方案，银边效果保留）；原生动作条隐藏加固——登录后 1s/3s/6s 延迟重试（覆盖暴雪大厅初始化后的重挂/重显），`/openui probe` 可查隐藏清单。（#57）

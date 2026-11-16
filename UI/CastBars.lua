@@ -14,7 +14,7 @@ local player = {}
 local target = {}
 local ticker
 
-local NATIVE_FRAMES = { "CastingBarFrame", "TargetFrameSpellBar" }
+local NATIVE_FRAMES = { "PlayerCastingBarFrame", "CastingBarFrame", "TargetFrameSpellBar" }
 local BAR_WIDTH, BAR_HEIGHT = 240, 14
 
 local function safe(fn, ...)
