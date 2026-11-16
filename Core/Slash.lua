@@ -93,15 +93,68 @@ SlashCmdList["OPENUI"] = function(msg)
             if red.SetTexture then green:SetTexture("Interface\\Buttons\\WHITE8X8") end
             if type(green.SetVertexColor) == "function" then green:SetVertexColor(0, 1, 0, 1) end
             swatch:Show()
-            -- #60：真实 Panel 管线样块（surface-container 底 + on-surface 文字 + outline 边框）
+            -- #64 probe v3：屏上主题读数 + 四对照条 + 主条帧名扫描
             local probePanel = OpenUI.Widgets and OpenUI.Widgets.Panel(UIParent)
             if probePanel then
-                probePanel:SetSize(220, 46)
-                probePanel:SetPoint("CENTER", UIParent, "CENTER", 0, -210)
-                local probeLabel = OpenUI.Widgets.Text(probePanel, "panel sample", "body")
-                probeLabel:SetPoint("CENTER", probePanel, "CENTER", 0, 0)
+                probePanel:SetSize(560, 150)
+                probePanel:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+                local surface = OpenUI.Theme.Get("color.surface-container")
+                local onSurface = OpenUI.Theme.Get("color.on-surface")
+                local function fmtColor(c)
+                    if type(c) ~= "table" then return "nil" end
+                    return ("%.3f/%.3f/%.3f"):format(c[1] or -1, c[2] or -1, c[3] or -1)
+                end
+                local info = ("surface=%s on=%s opacity=%.2f palette=%s")
+                    :format(fmtColor(surface), fmtColor(onSurface),
+                        OpenUI.Theme.Get("opacity.panel") or -1,
+                        tostring(OpenUI.Theme.GetPalette()))
+                local infoText = OpenUI.Widgets.Text(probePanel, info, "label")
+                infoText:SetPoint("TOPLEFT", probePanel, "TOPLEFT", 10, -8)
+
+                -- 四条对照条
+                local function strip(x, label, painter)
+                    local tex = probePanel:CreateTexture(nil, "ARTWORK")
+                    tex:SetPoint("TOPLEFT", probePanel, "TOPLEFT", x, -40)
+                    tex:SetSize(120, 44)
+                    painter(tex)
+                    local caption = OpenUI.Widgets.Text(probePanel, label, "label")
+                    caption:SetPoint("TOP", tex, "BOTTOM", 0, -4)
+                end
+                strip(10, "alpha1", function(tex)
+                    if surface then tex:SetColorTexture(surface[1], surface[2], surface[3], 1) end
+                end)
+                strip(150, "a088", function(tex)
+                    if surface then tex:SetColorTexture(surface[1], surface[2], surface[3], 0.88) end
+                end)
+                strip(290, "vtx", function(tex)
+                    if surface and type(tex.SetTexture) == "function" then
+                        tex:SetTexture("Interface\\Buttons\\WHITE8X8")
+                        if type(tex.SetVertexColor) == "function" then
+                            tex:SetVertexColor(surface[1], surface[2], surface[3], 1)
+                        end
+                    end
+                end)
+                strip(430, "ref05", function(tex)
+                    tex:SetColorTexture(0.5, 0.5, 0.5, 1)
+                end)
+
+                -- 主条帧名扫描
+                local candidates = {}
+                for name, value in pairs(_G) do
+                    if type(name) == "string" and type(value) == "table"
+                        and (name:find("MainMenu", 1, true) or name:find("MainBar", 1, true)
+                            or name:find("ActionBar", 1, true)) then
+                        candidates[#candidates + 1] = name
+                    end
+                end
+                table.sort(candidates)
+                local scan = "globals: " .. (#candidates > 0 and table.concat(candidates, ", ") or "(none)")
+                local scanText = OpenUI.Widgets.Text(probePanel, scan, "label")
+                scanText:SetPoint("TOPLEFT", probePanel, "TOPLEFT", 10, -108)
+                scanText:SetWidth(540)
+                print(scan)
                 if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
-                    C_Timer.After(10, function() probePanel:Hide() end)
+                    C_Timer.After(20, function() probePanel:Hide() end)
                 end
             end
             -- 结尾重复主题行，避免聊天滚动

@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 诊断增强（#64）：probe v3——样块面板屏上显示 surface/on-surface/opacity/palette 数值与四条对照（α=1/α=0.88/WHITE8X8 顶点色/0.5 灰参考），并扫描全局输出 MainMenu/MainBar/ActionBar 候选帧名（定位原生主条真名）。（#64）
 - 诊断增强（#60）：`/openui probe` v2——打印 `OpenUIDB.theme` 全量键值（检测旧/异常定制）、主题行首尾各打印一次（防聊天滚动丢失）、用真实 Panel 管线渲染"surface 底 + onSurface 文字 + outline 边框"样块（与红/绿测试块对照定位"值浅 vs 渲染浅"）。（#60）
 - 原生帧名兼容（#61）：施法条隐藏清单加入现代别名 `PlayerCastingBarFrame`（保留 CastingBarFrame）；动作条启用/脱战/延迟重试时尝试 `LoadAddOn("Blizzard_ActionBar")` 使懒加载帧就绪；Grid 全屏层增加 `SetMouseClickEnabled(false)` 硬化鼠标穿透（排除聊天文字无法选中的可能原因）。（#61）
 - 验收修复（#59）：动作条/宠物条/光环图标**全格填充**（去掉内缩，描边置于图标之上）；`Native.Snapshot` 升级为 `hidden=[…] missing=[…]`——暴露**未找到的原生帧名**（Forever 帧名差异导致隐藏静默失败的诊断关键，/openui probe 可见）。（#59）
