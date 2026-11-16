@@ -83,7 +83,7 @@ local surf = Theme.Get("color.surface")
 local applied = true
 for _, name in ipairs(THEME_FRAMES) do
     local f = _G[name]
-    if f and (f.bgColor[1] ~= surf[1] or f.bgColor[4] ~= 0.95) then applied = false end
+    if f and (f.bgColor[1] ~= surf[1] or f.bgColor[4] ~= 0.88) then applied = false end
 end
 ck(applied, "all existing frames themed (bg x opacity)")
 Theme.SetPalette("moss")

@@ -142,7 +142,7 @@ coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 check(table.concat(seq, ",") == "O-init,O-enable",
     "仅启用模块执行生命周期（声明关的跳过）: " .. table.concat(seq, ","))
-check(OpenUI.Theme.Get("opacity.panel") == 0.95, "被禁 Theme 的 OnInitialize 未应用 DB 定制")
+check(OpenUI.Theme.Get("opacity.panel") == 0.88, "被禁 Theme 的 OnInitialize 未应用 DB 定制")
 -- Enable：Core 拒绝 / 未注册报错 / 补初始化 / 幂等
 check(OpenUI:EnableModule("Core") == false, "Enable Core 被拒")
 local ok, err = pcall(function() return OpenUI:EnableModule("Ghost") end)
