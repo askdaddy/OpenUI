@@ -250,6 +250,8 @@ local function buildPetBar()
     else
         petBar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 64)
     end
+    -- #50：宠物条可拖（Alt+左键，含宠物按钮转发），位置持久化
+    OpenUI.Widgets.MakeDraggable(petBar, "actionbars", "pet", nil)
     for i = 1, PET_SLOTS do
         local button = CreateFrame("Button", nil, petBar, "SecureActionButtonTemplate")
         button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
@@ -258,7 +260,27 @@ local function buildPetBar()
         button:SetAttribute("type", "pet")
         button:SetAttribute("action", i)
         skinButton(button)
+        if type(button.RegisterForDrag) == "function" then
+            button:RegisterForDrag("LeftButton")
+            button:SetScript("OnDragStart", function()
+                local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
+                if alt and OpenUI:CanModifyNow() then petBar:StartMoving() end
+            end)
+            button:SetScript("OnDragStop", function()
+                petBar:StopMovingOrSizing()
+                if type(petBar.GetLeft) == "function" then
+                    local cfg = barConfig("pet")
+                    cfg.x = petBar:GetLeft()
+                    cfg.y = petBar:GetBottom()
+                end
+            end)
+        end
         petButtons[i] = button
+    end
+    local cfg = barConfig("pet")
+    if cfg.x and cfg.y and type(petBar.ClearAllPoints) == "function" then
+        petBar:ClearAllPoints()
+        petBar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", cfg.x, cfg.y)
     end
 end
 

@@ -11,6 +11,44 @@ local Widgets = {}
 local instances = {}
 
 -- ==== 装饰（#48）：1px 细边框 + 顶部渐亮 sheen + 半透明底 ====
+local function activeConfig()
+    if OpenUI.Profile and OpenUI.Profile.Config then
+        local cfg = OpenUI.Profile.Config()
+        if type(cfg) == "table" then return cfg end
+    end
+    if type(_G.OpenUIDB) ~= "table" then _G.OpenUIDB = {} end
+    return _G.OpenUIDB
+end
+
+-- #50：统一 Alt+左键拖拽助手（脱战；位置持久化到生效配置档）。
+-- section/key 为配置节点；point 为缺省锚点（可选，nil 表示不重锚）。
+function Widgets.MakeDraggable(frame, section, key, point)
+    if type(frame) ~= "table" then return end
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        local alt = type(IsAltKeyDown) == "function" and IsAltKeyDown()
+        if alt and OpenUI:CanModifyNow() then self:StartMoving() end
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        if type(self.GetLeft) ~= "function" then return end
+        local cfg = activeConfig()
+        if type(cfg[section]) ~= "table" then cfg[section] = {} end
+        cfg[section][key] = { x = self:GetLeft(), y = self:GetBottom() }
+    end)
+    local cfg = activeConfig()
+    local saved = type(cfg[section]) == "table" and cfg[section][key]
+    if type(saved) == "table" and saved.x and saved.y then
+        if type(frame.ClearAllPoints) == "function" then frame:ClearAllPoints() end
+        frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
+    elseif point then
+        if type(frame.ClearAllPoints) == "function" then frame:ClearAllPoints() end
+        frame:SetPoint(point[1], UIParent, point[2], point[3], point[4])
+    end
+end
+
 local function edgeTexture(frame, x1, y1, x2, y2, color, alpha)
     local t = frame:CreateTexture(nil, "BORDER")
     if type(t.SetColorTexture) == "function" then
@@ -26,7 +64,7 @@ local decorated = {}
 
 local function decorate(frame, kind)
     local border = Theme.Get("color.outline-variant")
-    local alpha = kind == "panel" and 0.85 or 0.6
+    local alpha = kind == "panel" and 0.9 or 0.7
     local edges = {
         edgeTexture(frame, 0, 0, 0, -1, border, alpha),   -- 上
         edgeTexture(frame, 0, 1, 0, 0, border, alpha),    -- 下
@@ -34,17 +72,23 @@ local function decorate(frame, kind)
         edgeTexture(frame, -1, 0, 0, 0, border, alpha),   -- 右
     }
     local sheen
-    if kind == "panel" and type(CreateColor) == "function" then
-        sheen = frame:CreateTexture(nil, "ARTWORK")
-        sheen:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-        sheen:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
-        if type(sheen.SetGradient) == "function" then
-            local top = Theme.Get("color.surface-container-highest")
-            sheen:SetGradient("VERTICAL",
-                CreateColor(top[1], top[2], top[3], 0.12),
-                CreateColor(top[1], top[2], top[3], 0))
-        else
-            sheen:Hide()
+    if kind == "panel" then
+        local top = Theme.Get("color.surface-container-highest")
+        if type(CreateColor) == "function" and type(frame.CreateTexture) == "function" then
+            sheen = frame:CreateTexture(nil, "ARTWORK")
+            sheen:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+            sheen:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+            if type(sheen.SetGradient) == "function" then
+                sheen:SetGradient("VERTICAL",
+                    CreateColor(top[1], top[2], top[3], 0.35),
+                    CreateColor(top[1], top[2], top[3], 0))
+            else
+                -- 降级：顶部 24px 亮带
+                sheen:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -1, -25)
+                if type(sheen.SetHeight) == "function" then sheen:SetHeight(24) end
+                sheen:SetColorTexture(top[1], top[2], top[3], 0.18)
+                sheen.gradientFallback = true
+            end
         end
     end
     decorated[#decorated + 1] = { frame = frame, edges = edges, sheen = sheen, kind = kind }
@@ -170,15 +214,17 @@ function Widgets.Refresh()
     local top = Theme.Get("color.surface-container-highest")
     for i = 1, #decorated do
         local d = decorated[i]
-        local alpha = d.kind == "panel" and 0.85 or 0.6
+        local alpha = d.kind == "panel" and 0.9 or 0.7
         for _, edge in ipairs(d.edges) do
             if type(edge.SetColorTexture) == "function" then
                 edge:SetColorTexture(border[1], border[2], border[3], alpha)
             end
         end
-        if d.sheen and type(d.sheen.SetGradient) == "function" and type(CreateColor) == "function" then
+        if d.sheen and d.sheen.gradientFallback and type(d.sheen.SetColorTexture) == "function" then
+            d.sheen:SetColorTexture(top[1], top[2], top[3], 0.18)
+        elseif d.sheen and type(d.sheen.SetGradient) == "function" and type(CreateColor) == "function" then
             d.sheen:SetGradient("VERTICAL",
-                CreateColor(top[1], top[2], top[3], 0.12),
+                CreateColor(top[1], top[2], top[3], 0.35),
                 CreateColor(top[1], top[2], top[3], 0))
         end
     end

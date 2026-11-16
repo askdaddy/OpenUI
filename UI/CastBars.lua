@@ -83,10 +83,10 @@ function CastBars.UpdateAll()
     CastBars.UpdateTarget()
 end
 
-local function buildUnit(anchor, name)
+local function buildUnit(point, name)
     local frame = Widgets.Panel(UIParent, { name = name })
     frame:SetSize(BAR_WIDTH + 8, 34)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, anchor)
+    frame:SetPoint(point[1], UIParent, point[2], point[3], point[4])
     frame:Hide()
     local label = Widgets.Text(frame, "", "label")
     label:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -2)
@@ -104,13 +104,27 @@ end
 local function build()
     if built then return end
     built = true
-    player = buildUnit(180, "OpenUIPlayerCastBar")
-    target = buildUnit(150, "OpenUITargetCastBar")
-    for _, parts in ipairs({ player, target }) do
+    player = buildUnit({ "TOPLEFT", "TOPLEFT", 20, -140 }, "OpenUIPlayerCastBar")
+    target = buildUnit({ "TOPLEFT", "TOPLEFT", 20, -180 }, "OpenUITargetCastBar")
+    local function paint(parts)
         local track = Theme.Get("color.surface-container-highest")
         parts.track:SetColorTexture(track[1], track[2], track[3], 1)
         local primary = Theme.Get("color.primary")
         parts.bar:SetColorTexture(primary[1], primary[2], primary[3], 1)
+    end
+    paint(player)
+    paint(target)
+    CastBars._paint = paint
+    -- #50：统一拖拽 + 主题刷新
+    Widgets.MakeDraggable(player.frame, "castbars", "player", { "TOPLEFT", "TOPLEFT", 20, -140 })
+    Widgets.MakeDraggable(target.frame, "castbars", "target", { "TOPLEFT", "TOPLEFT", 20, -180 })
+    if Theme.RegisterRefresh then
+        Theme.RegisterRefresh(function()
+            if built then
+                paint(player)
+                paint(target)
+            end
+        end)
     end
 end
 
