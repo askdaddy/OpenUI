@@ -19,8 +19,34 @@ local function ensureHider()
     return hider
 end
 
+-- #70（ForeverUI 实证策略）：受保护帧 / EditMode 管理帧绝不 Hide 或换父——
+-- 其 OnHide 会污染 Edit Mode 管理表（Forever 布局 pass 崩溃）。改为就地淡化 + 禁鼠标。
+local function isProtectedOrManaged(frame)
+    if frame.isManagedFrame == true then return true end
+    if type(frame.IsProtected) == "function" then
+        local ok, protected = pcall(function() return frame:IsProtected() end)
+        if ok and protected then return true end
+    end
+    return false
+end
+
+local function concealFrame(entry)
+    local frame = entry.frame
+    if not frame then return end
+    if entry.mode ~= "fade" then
+        entry.mode = "fade"
+        entry.alpha = (type(frame.GetAlpha) == "function" and frame:GetAlpha()) or 1
+    end
+    pcall(function() frame:SetAlpha(0.0001) end)
+    if type(frame.EnableMouse) == "function" then pcall(frame.EnableMouse, frame, false) end
+end
+
 local function hideFrame(entry)
     if not entry.frame then return end
+    if isProtectedOrManaged(entry.frame) then
+        return concealFrame(entry)
+    end
+    entry.mode = "hidden"
     entry.frame:SetParent(ensureHider())
     if entry.frame.Hide then entry.frame:Hide() end
 end
@@ -150,10 +176,19 @@ function Native.ApplyRestore(module)
     end
     for _, entry in pairs(record.frames) do
         if entry.frame then
-            pcall(function()
-                entry.frame:SetParent(entry.parent or UIParent)
-                if entry.frame.Show then entry.frame:Show() end
-            end)
+            if entry.mode == "fade" then
+                pcall(function()
+                    entry.frame:SetAlpha(entry.alpha or 1)
+                    if type(entry.frame.EnableMouse) == "function" then
+                        entry.frame:EnableMouse(true)
+                    end
+                end)
+            else
+                pcall(function()
+                    entry.frame:SetParent(entry.parent or UIParent)
+                    if entry.frame.Show then entry.frame:Show() end
+                end)
+            end
         end
     end
     record.restoring = true
@@ -167,8 +202,9 @@ function Native.Snapshot()
     for module, record in pairs(records) do
         local hidden, missing = {}, {}
         for _, name in ipairs(record.names or {}) do
-            if record.frames[name] then
-                hidden[#hidden + 1] = name
+            local entry = record.frames[name]
+            if entry then
+                hidden[#hidden + 1] = name .. (entry.mode == "fade" and "(fade)" or "(hidden)")
             else
                 missing[#missing + 1] = name
             end
