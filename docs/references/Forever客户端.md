@@ -55,6 +55,13 @@
 - `GetActionTexture(slot)` 返回**文件 ID 数字**（如 133052），可直接传给 `SetTexture`；`GetActionBarPage`、`C_ActionBar` 存在。
 - 界面模块启用时需隐藏对应原生帧；Native 助手按模块记账，并以 ADDON_LOADED / PLAYER_ENTERING_WORLD / 脱战 + 登录后 1s/3s/6s 重试覆盖懒加载与大厅重挂。
 
+### 原生 UI 接管策略（2026-11-17 研究结论）
+
+- **ElvUI**：复用暴雪动作按钮（SetParent 到自有条），再把条壳帧 `SetParent(HiddenFrame)` + `UnregisterAllEvents`；帧名线索 `MainActionBar`、`MicroButtonAndBagsBar`、`StatusTrackingBarManager:Kill()`。
+- **ForeverUI（本客户端实证，含 2026-09-26 故障记录）**：**受保护帧与 Edit Mode 管理帧绝不 Hide 或换父**——其 OnHide 会污染 Edit Mode 管理表，Forever 布局 pass 随后读取光环数据崩溃；目标的目标 OnHide 会重配目标框光环容器，导致 `CompactUnitFrame ... secret number value ... tainted`。做法是就地"Conceal"：`SetAlpha(≈0)` + `EnableMouse(false)` + `UnregisterAllEvents`；仅普通帧才 Hide + SetParent(hidden)。其源码明言隐藏"需要 /reload 才能撤销"。
+- **OpenUI 采用**（Native v3，#70）：`IsProtected()` / `isManagedFrame` 帧 → 淡化 alpha=0.0001 + 禁鼠标（可逆恢复，不解注册事件以保证运行时开关可恢复）；普通帧维持 Hide+SetParent；`/openui probe` 以 `(fade)/(hidden)` 标注模式。原生动作条帧名清单以 ForeverUI 的清单为事实来源（多版本别名并存、缺失跳过）。
+- 已知限制：若某帧被归类为普通帧并执行了隐藏，其事件注册不会自动恢复（与参考实现相同的限制），极端情况需 /reload。
+
 ### 参考实现（examples/，只读、不提交）
 
 - `examples/elvui-16.01`：网格（`/egrid`、`Grid_Create`）、Movers 拖拽淡入淡出、Backdrop/gloss 纹理方案；
