@@ -31,9 +31,20 @@ local built = false
 local eventsRegistered = false
 
 local NATIVE_BARS = {
-    "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
-    "MultiBarLeft", "MultiBarRight", "MultiBar5", "MultiBar6", "MultiBar7",
-    "PetActionBar",
+    -- 底栏与美术件（帧名事实来源：examples/ForeverUI Modules/ActionBars/ActionBars.lua 清单，
+    -- 多版本别名并存，缺失的跳过）
+    "MainMenuBar", "MainMenuBarArtFrame", "MainActionBar",
+    "MainMenuBarLeftEndCap", "MainMenuBarRightEndCap",
+    "MainMenuBarTexture0", "MainMenuBarTexture1", "MainMenuBarTexture2", "MainMenuBarTexture3",
+    "MainMenuBarTextureExtender", "MainMenuBarMaxLevelBar",
+    "MainMenuBarPerformanceBarFrame", "MainMenuBarPageNumber",
+    "ActionBarUpButton", "ActionBarDownButton",
+    -- 多条
+    "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarLeft", "MultiBarRight",
+    "MultiBar5", "MultiBar6", "MultiBar7",
+    -- 姿态/宠物/额外/图腾
+    "StanceBarFrame", "StanceBar", "PossessBarFrame", "PossessActionBar",
+    "PetActionBar", "PetActionBarFrame", "MultiCastActionBarFrame",
 }
 
 local PAGE_DRIVER = "[bonusbar:5] 6; [bonusbar:4] 5; [bonusbar:3] 4; [bonusbar:2] 3; "

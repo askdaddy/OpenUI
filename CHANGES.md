@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- Native v3（#70，按 examples/ForeverUI 实证策略）：受保护帧与 EditMode 管理帧（`IsProtected()`/`isManagedFrame`）不再 Hide/换父，改为就地淡化 alpha=0.0001 + 禁鼠标（恢复时可逆；避免 OnHide 污染 Edit Mode 管理表引发 taint 崩溃）；普通帧维持 Hide+SetParent；Snapshot 标注 `(fade)/(hidden)`；动作条原生清单补全（MainActionBar/MainMenuBar 美术件全系/Stance/Possess/MultiCast 等，帧名事实来源 ForeverUI）。（#70）
 - 善后修复（#69 跟进）：`Widgets.Edge` 增加 owner/anchor 分离（纹理不能 CreateTexture，此前单位框体/施法条把纹理当 owner 传入导致构建失败）；单位框体条描边与施法条描边改用正确锚点。全量 38 套件绿。（#69 跟进）
 - **根因修复3（#69）**：`edgeTexture` 下边框锚点错误（TOPLEFT(0,1)+BOTTOMRIGHT(0,0)）生成的是**覆盖整框的薄膜**（0.408 灰×0.95），这是"面板浅灰、文字变暗"系列现象的真正原因（probe v5 A/B 差分确证）。新增 `Widgets.Edge(frame, side, color, alpha)`（每边两点锚定+SetHeight/SetWidth(1)），Widgets 四边、动作按钮四边、单位框体条描边、施法条描边全部替换。（#69）
 - 诊断增强（#68）：probe v5——Widgets.Panel vs ForeverUI 裸克隆配方并排（A/B）、裸 FontString vs Widgets.Text（C）、带/不带阴影（D），一次截图定位"深底变白/亮字变黑"的触发层。（#68）
