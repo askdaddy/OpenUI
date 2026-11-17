@@ -27,6 +27,8 @@ local function mkframe(t,name,parent)
   function f:SetAttribute(k,v) self.attrs[k]=v end function f:GetAttribute(k) return self.attrs[k] end
   function f:SetFrameRef(k,v) self.refs[k]=v end function f:RegisterForClicks() end
   function f:SetParent(p) self.parent=p end function f:GetParent() return self.parent end
+  function f:SetAlpha(a) self.alpha=a end function f:GetAlpha() return self.alpha or 1 end
+  function f:EnableMouse(v) self.mouse=v end
   function f:SetBackdropColor(r,g,b,a) self.bgColor={r,g,b,a} end function f:GetBackdropColor() return table.unpack(self.bgColor or {0,0,0,0}) end
   function f:SetBackdropBorderColor(r,g,b,a) self.borderColor={r,g,b,a} end function f:GetBackdropBorderColor() return table.unpack(self.borderColor or {0,0,0,0}) end
   function f:GetFont() return "FRIZQT__.TTF", 14, "" end function f:SetFont(file,size,flags) self.fontFile=file self.fontSize=size end
