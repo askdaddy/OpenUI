@@ -111,8 +111,10 @@ Native.Restore("Ghost")
 print("== S7 受保护/管理帧淡化策略（#70）==")
 local ProtectedFrame = mkframe("Frame", "ProtectedFrame", UIParent)
 function ProtectedFrame:IsProtected() return true end
+_G.ProtectedFrame = ProtectedFrame
 local ManagedFrame = mkframe("Frame", "ManagedFrame", UIParent)
 ManagedFrame.isManagedFrame = true
+_G.ManagedFrame = ManagedFrame
 Native.Hide("TestFade", { "ProtectedFrame", "ManagedFrame" })
 ck(math.abs((ProtectedFrame.alpha or 1) - 0.0001) < 1e-9, "受保护帧淡化为 0.0001（不隐藏）")
 ck(ProtectedFrame.parent == UIParent and ProtectedFrame:IsShown(), "受保护帧不换父不隐藏")
