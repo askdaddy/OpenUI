@@ -108,6 +108,24 @@ for _, line in ipairs(Native.Snapshot()) do
 end
 ck(found, "Snapshot 输出 missing=[NoSuchFrameZZZ]（帧名不匹配可诊断）")
 Native.Restore("Ghost")
+print("== S7 受保护/管理帧淡化策略（#70）==")
+local ProtectedFrame = mkframe("Frame", "ProtectedFrame", UIParent)
+function ProtectedFrame:IsProtected() return true end
+local ManagedFrame = mkframe("Frame", "ManagedFrame", UIParent)
+ManagedFrame.isManagedFrame = true
+Native.Hide("TestFade", { "ProtectedFrame", "ManagedFrame" })
+ck(math.abs((ProtectedFrame.alpha or 1) - 0.0001) < 1e-9, "受保护帧淡化为 0.0001（不隐藏）")
+ck(ProtectedFrame.parent == UIParent and ProtectedFrame:IsShown(), "受保护帧不换父不隐藏")
+ck(ProtectedFrame.mouse == false, "受保护帧禁鼠标")
+ck(ManagedFrame.isManagedFrame and math.abs((ManagedFrame.alpha or 1) - 0.0001) < 1e-9,
+    "EditMode 管理帧同样淡化")
+local fadeLabel = false
+for _, line in ipairs(Native.Snapshot()) do
+    if line:find("TestFade", 1, true) and line:find("(fade)", 1, true) then fadeLabel = true end
+end
+ck(fadeLabel, "Snapshot 标注 (fade) 模式")
+Native.Restore("TestFade")
+ck((ProtectedFrame.alpha or 1) == 1 and ProtectedFrame.mouse == true, "恢复 alpha 与鼠标")
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then for _, f in ipairs(failures) do io.stderr:write("FAIL: "..f.."\n") end os.exit(1) end
 os.exit(0)
