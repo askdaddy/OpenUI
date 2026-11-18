@@ -1,7 +1,8 @@
--- 主控面板（#46）：模块分类总览 + 模块独立设置小窗。
--- 用户方向（2026-11-16）：所有模块分类显示在主控面板；每个模块的设置新开小窗。
--- 决策（推荐项）：总览三列磁贴（类目：基础/战斗界面/系统窗口/工具）；
--- 模块小窗单实例，含「启用」开关与模块专属控件（注册表可扩展）；搜索过滤磁贴。
+-- 主控面板 v2（#71）：滚动容器 + 卡片式磁贴 + 分区视觉层级。
+-- 结构：固定页眉（标题/搜索/布局编辑/关闭 + 分隔线）→ 滚轮滚动的正文（类目分区 × 卡片磁贴）
+--   → 固定页脚提示；模块小窗带标题带与主色强调条。
+-- 滚动采用 examples/ForeverUI Config/GUI.lua 的纯 API 模式（ScrollFrame + SetScrollChild + OnMouseWheel，
+-- 无模板依赖）；卡片边线用 Widgets.Edge（#69 配方）。
 
 local _, ns = ...
 local OpenUI = ns.OpenUI
@@ -12,9 +13,13 @@ local Locale = OpenUI.Locale
 
 local Settings = {}
 
-local WINDOW_W, WINDOW_H = 640, 520
-local MODULE_W, MODULE_H = 400, 300
-local TILE_W, TILE_H, TILE_GAP, TILE_COLS = 196, 26, 6, 3
+local WINDOW_W, WINDOW_H = 700, 520
+local MODULE_W, MODULE_H = 420, 330
+local TILE_W, TILE_H, TILE_GAP, TILE_COLS = 150, 34, 10, 4
+local HEADER_H = 62   -- 页眉高度（含分隔线）
+local FOOTER_H = 30   -- 页脚高度
+local SECTION_HEAD_H = 30
+local SECTION_GAP = 18
 
 local CATEGORY_ORDER = { "core", "combat", "panels", "tools" }
 local CATEGORY_LABELS = {
@@ -66,10 +71,12 @@ local MODULE_LABELS = {
     Grid = "SETTINGS_MOD_GRID",
 }
 
-local frame, searchBox, noResultsText, hubHost
-local hubTiles = {}        -- moduleName -> { button, category }
-local categoryHeaders = {} -- categoryId -> FontString
-local labelRefs = {}       -- { fs = FontString, update = fn }
+local frame, searchBox, noResultsText
+local scrollFrame, scrollContent
+local contentHeight = 0
+local hubTiles = {}        -- moduleName -> { button, category, edges, bg, label, dot }
+local categorySections = {} -- categoryId -> { frame, header, accent, count }
+local labelRefs = {}       -- { fs, update }
 local modulePanels = {}    -- moduleName -> { build = fn(host) }
 local modWindow, modHost, modTitle
 local currentModule
@@ -94,36 +101,142 @@ function Settings.RegisterModulePanel(moduleName, def)
     modulePanels[moduleName] = def
 end
 
--- ==== 模块小窗 ====
-local function refreshTileStates()
-    for name, tile in pairs(hubTiles) do
-        local enabled = OpenUI:IsModuleEnabled(name)
-        tile.button.themedLabel:SetText((enabled and "● " or "○ ") .. moduleLabel(name))
+-- ==== 卡片磁贴（#71）：边框 + 底色 + 左名右点 + 悬停主色边 ====
+local function tilePaint(tile, hovered)
+    local border = hovered and Theme.Get("color.primary") or Theme.Get("color.outline")
+    local bg = hovered and Theme.Get("color.surface-container-highest")
+        or Theme.Get("color.surface-container-high")
+    if tile.bg and type(tile.bg.SetColorTexture) == "function" and bg then
+        tile.bg:SetColorTexture(bg[1], bg[2], bg[3], 0.95)
+    end
+    for _, edge in ipairs(tile.edges or {}) do
+        if type(edge.SetColorTexture) == "function" and border then
+            edge:SetColorTexture(border[1], border[2], border[3], hovered and 1.0 or 0.85)
+        end
     end
 end
 
+local function buildTile(parent, name, category)
+    local tile = CreateFrame("Button", nil, parent)
+    tile:SetSize(TILE_W, TILE_H)
+
+    local bg = tile:CreateTexture(nil, "BACKGROUND", nil, -8)
+    bg:SetAllPoints(tile)
+
+    local label = tile:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    label:SetPoint("LEFT", tile, "LEFT", 10, 0)
+    if type(label.SetJustifyH) == "function" then label:SetJustifyH("LEFT") end
+    if type(label.SetShadowOffset) == "function" then
+        label:SetShadowOffset(1, -1)
+        if type(label.SetShadowColor) == "function" then label:SetShadowColor(0, 0, 0, 0.9) end
+    end
+    label:SetText(moduleLabel(name))
+
+    local dot = tile:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    dot:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
+    dot:SetText("○")
+
+    local edges = {}
+    if Widgets.Edge then
+        local border = Theme.Get("color.outline")
+        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+            local e = Widgets.Edge(tile, side, border, 0.85)
+            if e then edges[#edges + 1] = e end
+        end
+    end
+
+    local entry = {
+        button = tile, category = category, edges = edges, bg = bg,
+        label = label, dot = dot,
+    }
+    tile.themedLabel = label -- 兼容既有测试/检索
+
+    tile:SetScript("OnEnter", function() tilePaint(entry, true) end)
+    tile:SetScript("OnLeave", function() tilePaint(entry, false) end)
+    tile:SetScript("OnClick", function() Settings.OpenModule(name) end)
+
+    tilePaint(entry, false)
+    return entry
+end
+
+local function refreshTileStates()
+    for name, tile in pairs(hubTiles) do
+        local enabled = OpenUI:IsModuleEnabled(name)
+        tile.label:SetText(moduleLabel(name))
+        local state = enabled and "●" or "○"
+        local color = enabled and Theme.Get("color.primary") or Theme.Get("color.outline")
+        tile.dot:SetText(state)
+        if type(tile.dot.SetTextColor) == "function" and color then
+            tile.dot:SetTextColor(color[1], color[2], color[3], 1)
+        end
+        tile.label:SetAlpha(enabled and 1.0 or 0.55)
+    end
+end
+
+-- ==== 模块小窗（#71：标题带 + 主色强调条 + 方形关闭钮） ====
 local function buildModuleWindow()
     if modWindow then return end
     modWindow = Widgets.Panel(UIParent, { name = "OpenUIModuleSettings" })
     modWindow:SetSize(MODULE_W, MODULE_H)
-    modWindow:SetPoint("LEFT", frame, "RIGHT", 10, 0)
+    modWindow:SetPoint("LEFT", frame, "RIGHT", 12, 0)
     modWindow:SetMovable(true)
     modWindow:EnableMouse(true)
     modWindow:RegisterForDrag("LeftButton")
     modWindow:SetScript("OnDragStart", modWindow.StartMoving)
     modWindow:SetScript("OnDragStop", modWindow.StopMovingOrSizing)
 
-    modTitle = Widgets.Text(modWindow, "", "headline")
-    modTitle:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 12, -10)
+    -- 标题带：深色底 + 左侧 3px 主色条
+    local barBg = modWindow:CreateTexture(nil, "BACKGROUND", nil, -8)
+    barBg:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 0, 0)
+    barBg:SetPoint("TOPRIGHT", modWindow, "TOPRIGHT", 0, 0)
+    if type(barBg.SetHeight) == "function" then barBg:SetHeight(38) end
+    local barColor = Theme.Get("color.surface-container-highest")
+    if barColor then barBg:SetColorTexture(barColor[1], barColor[2], barColor[3], 0.95) end
+
+    local accent = modWindow:CreateTexture(nil, "OVERLAY", nil, 7)
+    accent:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 0, 0)
+    accent:SetPoint("BOTTOMLEFT", barBg, "BOTTOMLEFT", 0, 0)
+    if type(accent.SetWidth) == "function" then accent:SetWidth(3) end
+    local primary = Theme.Get("color.primary")
+    if primary then accent:SetColorTexture(primary[1], primary[2], primary[3], 1) end
+
+    modTitle = modWindow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    modTitle:SetPoint("LEFT", accent, "RIGHT", 10, 0)
+    if type(modTitle.SetJustifyH) == "function" then modTitle:SetJustifyH("LEFT") end
+    if type(modTitle.SetShadowOffset) == "function" then
+        modTitle:SetShadowOffset(1, -1)
+        if type(modTitle.SetShadowColor) == "function" then
+            modTitle:SetShadowColor(0, 0, 0, 0.9)
+        end
+    end
     addLabelRef(modTitle, function()
         modTitle:SetText(currentModule and moduleLabel(currentModule) or "")
     end)
 
-    local close = Widgets.Button(modWindow, L.SETTINGS_CLOSE)
-    close:SetPoint("TOPRIGHT", modWindow, "TOPRIGHT", -10, -8)
-    close:SetSize(64, 22)
-    close:SetScript("OnClick", function() Settings.CloseModule() end)
-    addLabelRef(close.themedLabel, function() close.themedLabel:SetText(L.SETTINGS_CLOSE) end)
+    -- 方形关闭钮（×）
+    local closeBtn = CreateFrame("Button", nil, modWindow)
+    closeBtn:SetSize(26, 26)
+    closeBtn:SetPoint("TOPRIGHT", modWindow, "TOPRIGHT", -8, -6)
+    local closeBg = closeBtn:CreateTexture(nil, "BACKGROUND", nil, -8)
+    closeBg:SetAllPoints(closeBtn)
+    local cbColor = Theme.Get("color.surface-container-high")
+    if cbColor then closeBg:SetColorTexture(cbColor[1], cbColor[2], cbColor[3], 0.95) end
+    if Widgets.Edge then
+        local border = Theme.Get("color.outline")
+        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+            Widgets.Edge(closeBtn, side, border, 0.85)
+        end
+    end
+    local closeLabel = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    closeLabel:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
+    closeLabel:SetText("×")
+    closeBtn:SetScript("OnClick", function() Settings.CloseModule() end)
+    closeBtn.themedLabel = closeLabel
+
+    -- 底部分隔线
+    if Widgets.Edge then
+        Widgets.Edge(modWindow, "top", Theme.Get("color.outline"), 0.6, barBg)
+    end
 
     local toggle = Widgets.Toggle(modWindow, "SETTINGS_MODULE_TOGGLE",
         function() return currentModule and OpenUI:IsModuleEnabled(currentModule) end,
@@ -137,8 +250,8 @@ local function buildModuleWindow()
             end
             refreshTileStates()
         end)
-    toggle:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 12, -44)
-    toggle:SetSize(200, 24)
+    toggle:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 14, -46)
+    toggle:SetSize(210, 24)
 
     if type(UISpecialFrames) == "table" then
         table.insert(UISpecialFrames, "OpenUIModuleSettings")
@@ -154,11 +267,11 @@ end
 
 local function buildModuleHost()
     modHost = CreateFrame("Frame", nil, modWindow)
-    modHost:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 12, -78)
-    modHost:SetSize(MODULE_W - 24, MODULE_H - 90)
+    modHost:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 14, -80)
+    modHost:SetSize(MODULE_W - 28, MODULE_H - 94)
 end
 
--- 内建模块面板（推荐项）
+-- ==== 内建模块面板 ====
 local function buildThemePanel(host)
     local names = { "starblue", "teal", "amber", "amethyst", "rose", "moss", "graphite" }
     local buttons = {}
@@ -170,8 +283,8 @@ local function buildThemePanel(host)
     end
     for i, name in ipairs(names) do
         local btn = Widgets.Button(host, name)
-        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 28)
-        btn:SetSize(180, 24)
+        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 30)
+        btn:SetSize(190, 26)
         btn:SetScript("OnClick", function()
             Theme.SetPalette(name)
             mark()
@@ -194,8 +307,8 @@ local function buildLocalePanel(host)
     end
     for i, choice in ipairs(choices) do
         local btn = Widgets.Button(host, choice.label or L[choice.labelKey])
-        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 28)
-        btn:SetSize(180, 24)
+        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 30)
+        btn:SetSize(190, 26)
         btn:SetScript("OnClick", function()
             Locale.Set(choice.id)
             mark()
@@ -213,8 +326,8 @@ local function buildDiagnosticsPanel(host)
         count:SetText(L.SETTINGS_ERRORS_COUNT:format(#OpenUI.Diagnose.Errors()))
     end)
     local open = Widgets.Button(host, L.SETTINGS_DIAG_OPEN)
-    open:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -32)
-    open:SetSize(180, 24)
+    open:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -34)
+    open:SetSize(190, 26)
     open:SetScript("OnClick", function()
         if OpenUI.Diagnostics then OpenUI.Diagnostics.Open() end
     end)
@@ -247,9 +360,10 @@ local function buildGenericPanel(host)
     addLabelRef(hint, function() hint:SetText(L.SETTINGS_MODULE_NO_OPTIONS) end)
 end
 
--- ==== 总览 ====
+-- ==== 总览正文（滚动内容：类目分区 × 卡片磁贴） ====
 local function buildHub()
     local y = 0
+    local contentW = WINDOW_W - 32
     for _, category in ipairs(CATEGORY_ORDER) do
         local modules = {}
         for _, module in ipairs(OpenUI.moduleOrder) do
@@ -258,28 +372,60 @@ local function buildHub()
             end
         end
         if #modules > 0 then
-            local header = Widgets.Text(hubHost, L[CATEGORY_LABELS[category]], "title")
-            header:SetPoint("TOPLEFT", hubHost, "TOPLEFT", 0, y)
+            -- 分区容器（独立 Frame，便于整段隐藏）
+            local section = CreateFrame("Frame", nil, scrollContent)
+            section:SetSize(contentW, SECTION_HEAD_H)
+
+            -- 主色竖条 + 类目标题 + 计数
+            local accent = section:CreateTexture(nil, "OVERLAY", nil, 7)
+            accent:SetPoint("TOPLEFT", section, "TOPLEFT", 0, -2)
+            if type(accent.SetWidth) == "function" then accent:SetWidth(3) end
+            if type(accent.SetHeight) == "function" then accent:SetHeight(16) end
+            local primary = Theme.Get("color.primary")
+            if primary then accent:SetColorTexture(primary[1], primary[2], primary[3], 1) end
+
+            local header = section:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            header:SetPoint("LEFT", accent, "RIGHT", 8, 0)
+            if type(header.SetJustifyH) == "function" then header:SetJustifyH("LEFT") end
+            if type(header.SetShadowOffset) == "function" then
+                header:SetShadowOffset(1, -1)
+                if type(header.SetShadowColor) == "function" then
+                    header:SetShadowColor(0, 0, 0, 0.9)
+                end
+            end
+            header:SetText(L[CATEGORY_LABELS[category]])
             addLabelRef(header, function() header:SetText(L[CATEGORY_LABELS[category]]) end)
-            categoryHeaders[category] = header
-            y = y - 30
+
+            local count = section:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            count:SetPoint("LEFT", header, "RIGHT", 8, 0)
+            count:SetText(tostring(#modules))
+
+            -- 磁贴网格
             local col, row = 0, 0
+            local rows = 0
             for _, name in ipairs(modules) do
-                local btn = Widgets.Button(hubHost, moduleLabel(name))
-                btn:SetPoint("TOPLEFT", hubHost, "TOPLEFT",
-                    col * (TILE_W + TILE_GAP), y - row * (TILE_H + TILE_GAP))
-                btn:SetSize(TILE_W, TILE_H)
-                local captured = name
-                btn:SetScript("OnClick", function() Settings.OpenModule(captured) end)
-                hubTiles[name] = { button = btn, category = category }
+                local tile = buildTile(section, name, category)
+                tile.button:SetPoint("TOPLEFT", section, "TOPLEFT",
+                    col * (TILE_W + TILE_GAP), -SECTION_HEAD_H - row * (TILE_H + TILE_GAP))
+                hubTiles[name] = tile
                 col = col + 1
                 if col >= TILE_COLS then
                     col, row = 0, row + 1
                 end
             end
-            local usedRows = row + ((col > 0) and 1 or 0)
-            y = y - usedRows * (TILE_H + TILE_GAP) - 8
+            rows = row + ((col > 0) and 1 or 0)
+
+            local sectionH = SECTION_HEAD_H + rows * (TILE_H + TILE_GAP)
+            section:SetSize(contentW, sectionH)
+            section:SetPoint("TOPLEFT", scrollContent, "TOPLEFT", 0, y)
+            categorySections[category] = { frame = section, header = header, accent = accent }
+            y = y - sectionH - SECTION_GAP
         end
+    end
+    contentHeight = -y
+    scrollContent:SetSize(contentW, math.max(contentHeight, 10))
+    if type(scrollFrame.SetScrollChild) == "function" then
+        scrollFrame:SetScrollChild(scrollContent)
     end
 end
 
@@ -294,55 +440,26 @@ local function build()
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
-    local title = Widgets.Text(frame, L.SETTINGS_TITLE, "headline")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -12)
+    -- ==== 页眉（固定） ====
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -14)
+    if type(title.SetJustifyH) == "function" then title:SetJustifyH("LEFT") end
+    if type(title.SetShadowOffset) == "function" then
+        title:SetShadowOffset(1, -1)
+        if type(title.SetShadowColor) == "function" then title:SetShadowColor(0, 0, 0, 0.9) end
+    end
+    title:SetText(L.SETTINGS_TITLE)
     addLabelRef(title, function() title:SetText(L.SETTINGS_TITLE) end)
 
     local close = Widgets.Button(frame, L.SETTINGS_CLOSE)
     close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -10)
-    close:SetSize(72, 22)
+    close:SetSize(72, 24)
     close:SetScript("OnClick", function() Settings.Close() end)
     addLabelRef(close.themedLabel, function() close.themedLabel:SetText(L.SETTINGS_CLOSE) end)
 
-    local searchLabel = Widgets.Text(frame, L.SETTINGS_SEARCH, "label")
-    searchLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -46)
-    addLabelRef(searchLabel, function() searchLabel:SetText(L.SETTINGS_SEARCH) end)
-    searchBox = CreateFrame("EditBox", nil, frame)
-    searchBox:SetAutoFocus(false)
-    searchBox:SetText("")
-    searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -64)
-    searchBox:SetSize(200, 20)
-    if type(searchBox.SetFontObject) == "function" and type(GameFontHighlight) == "table" then
-        searchBox:SetFontObject(GameFontHighlight)
-    end
-    local textColor = Theme.Get("color.on-surface")
-    if type(searchBox.SetTextColor) == "function" and type(textColor) == "table" then
-        searchBox:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
-    end
-    if type(searchBox.SetTextInsets) == "function" then
-        searchBox:SetTextInsets(6, 6, 0, 0)
-    end
-    local searchBg = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
-    searchBg:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -2, 2)
-    searchBg:SetPoint("BOTTOMRIGHT", searchBox, "BOTTOMRIGHT", 2, -2)
-    local sc = Theme.Get("color.surface-container-highest")
-    searchBg:SetColorTexture(sc[1], sc[2], sc[3], 0.9)
-    searchBox:SetScript("OnTextChanged", function(self)
-        Settings.ApplyFilter(self:GetText())
-    end)
-    searchBox:SetScript("OnMouseDown", function(self)
-        self:SetFocus()
-    end)
-    searchBox:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-    end)
-    searchBox:SetScript("OnEnterPressed", function(self)
-        self:ClearFocus()
-    end)
-
     local editButton = Widgets.Button(frame, L.SETTINGS_EDIT_MODE)
-    editButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 232, -60)
-    editButton:SetSize(140, 24)
+    editButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -96, -10)
+    editButton:SetSize(96, 24)
     editButton:SetScript("OnClick", function()
         if OpenUI.EditMode then
             OpenUI.EditMode.Toggle()
@@ -355,13 +472,78 @@ local function build()
         editButton.themedLabel:SetText(marker .. L.SETTINGS_EDIT_MODE)
     end)
 
-    hubHost = CreateFrame("Frame", nil, frame)
-    hubHost:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -94)
-    hubHost:SetSize(WINDOW_W - 32, WINDOW_H - 112)
-    noResultsText = Widgets.Text(hubHost, L.SETTINGS_NO_RESULTS, "body")
-    noResultsText:SetPoint("TOPLEFT", hubHost, "TOPLEFT", 0, 0)
+    -- 搜索框（带底与边）
+    searchBox = CreateFrame("EditBox", nil, frame)
+    searchBox:SetAutoFocus(false)
+    searchBox:SetText("")
+    searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 230, -12)
+    searchBox:SetSize(280, 24)
+    if type(searchBox.SetFontObject) == "function" and type(GameFontHighlight) == "table" then
+        searchBox:SetFontObject(GameFontHighlight)
+    end
+    local textColor = Theme.Get("color.on-surface")
+    if type(searchBox.SetTextColor) == "function" and type(textColor) == "table" then
+        searchBox:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
+    end
+    if type(searchBox.SetTextInsets) == "function" then
+        searchBox:SetTextInsets(8, 8, 0, 0)
+    end
+    local searchBg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+    searchBg:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -2, 2)
+    searchBg:SetPoint("BOTTOMRIGHT", searchBox, "BOTTOMRIGHT", 2, -2)
+    local sc = Theme.Get("color.surface-container-high")
+    if sc then searchBg:SetColorTexture(sc[1], sc[2], sc[3], 0.95) end
+    if Widgets.Edge then
+        local border = Theme.Get("color.outline")
+        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
+            Widgets.Edge(searchBox, side, border, 0.85, searchBox)
+        end
+    end
+    searchBox:SetScript("OnTextChanged", function(self)
+        Settings.ApplyFilter(self:GetText())
+    end)
+    searchBox:SetScript("OnMouseDown", function(self) self:SetFocus() end)
+    searchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+    -- 页眉分隔线
+    local divider = frame:CreateTexture(nil, "OVERLAY", nil, 7)
+    divider:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -HEADER_H)
+    divider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -HEADER_H)
+    if type(divider.SetHeight) == "function" then divider:SetHeight(1) end
+    local outline = Theme.Get("color.outline")
+    if outline then divider:SetColorTexture(outline[1], outline[2], outline[3], 0.6) end
+
+    -- ==== 正文（滚动） ====
+    scrollFrame = CreateFrame("ScrollFrame", nil, frame)
+    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -(HEADER_H + 8))
+    scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, FOOTER_H)
+    if type(scrollFrame.EnableMouseWheel) == "function" then
+        scrollFrame:EnableMouseWheel(true)
+        scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+            local range = (type(self.GetVerticalScrollRange) == "function"
+                and self:GetVerticalScrollRange()) or 0
+            local current = (type(self.GetVerticalScroll) == "function"
+                and self:GetVerticalScroll()) or 0
+            local target = current - delta * 40
+            if type(self.SetVerticalScroll) == "function" then
+                self:SetVerticalScroll(math.max(0, math.min(range, target)))
+            end
+        end)
+    end
+    scrollContent = CreateFrame("Frame", nil, scrollFrame)
+
+    noResultsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    noResultsText:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -(HEADER_H + 16))
+    noResultsText:SetText(L.SETTINGS_NO_RESULTS)
     noResultsText:Hide()
     addLabelRef(noResultsText, function() noResultsText:SetText(L.SETTINGS_NO_RESULTS) end)
+
+    -- ==== 页脚（固定） ====
+    local footer = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 16, 10)
+    footer:SetText(L.SETTINGS_HINT)
+    addLabelRef(footer, function() footer:SetText(L.SETTINGS_HINT) end)
 
     buildHub()
     refreshTileStates()
@@ -434,8 +616,12 @@ function Settings.ApplyFilter(query)
             tile.button:Hide()
         end
     end
-    for category, header in pairs(categoryHeaders) do
-        if perCategory[category] then header:Show() else header:Hide() end
+    for category, section in pairs(categorySections) do
+        if perCategory[category] or query == "" then
+            section.frame:Show()
+        else
+            section.frame:Hide()
+        end
     end
     if noResultsText then
         if (not any) and query ~= "" then noResultsText:Show() else noResultsText:Hide() end
@@ -459,6 +645,7 @@ Settings.IsModuleWindowShown = function()
 end
 Settings.CurrentModule = function() return currentModule end
 Settings.Tile = function(name) return hubTiles[name] end
+Settings.ContentHeight = function() return contentHeight end
 
 OpenUI.Settings = Settings
 
