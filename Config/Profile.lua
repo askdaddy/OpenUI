@@ -182,6 +182,7 @@ end
 OpenUI.Profile = Profile
 
 OpenUI:RegisterModule("Profile", {
+    alwaysEnabled = true,
     OnInitialize = function()
         migrate()
     end,

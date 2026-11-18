@@ -1,652 +1,668 @@
--- 主控面板 v2（#71）：滚动容器 + 卡片式磁贴 + 分区视觉层级。
--- 结构：固定页眉（标题/搜索/布局编辑/关闭 + 分隔线）→ 滚轮滚动的正文（类目分区 × 卡片磁贴）
---   → 固定页脚提示；模块小窗带标题带与主色强调条。
--- 滚动采用 examples/ForeverUI Config/GUI.lua 的纯 API 模式（ScrollFrame + SetScrollChild + OnMouseWheel，
--- 无模板依赖）；卡片边线用 Widgets.Edge（#69 配方）。
-
+-- 主控面板：固定导航与页脚，模块配置在窗口内独立滚动。
 local _, ns = ...
 local OpenUI = ns.OpenUI
-local L = OpenUI.L
-local Theme = OpenUI.Theme
-local Widgets = OpenUI.Widgets
-local Locale = OpenUI.Locale
-
-local Settings = {}
-
-local WINDOW_W, WINDOW_H = 700, 520
-local MODULE_W, MODULE_H = 420, 330
-local TILE_W, TILE_H, TILE_GAP, TILE_COLS = 150, 34, 10, 4
-local HEADER_H = 62   -- 页眉高度（含分隔线）
-local FOOTER_H = 30   -- 页脚高度
-local SECTION_HEAD_H = 30
-local SECTION_GAP = 18
-
-local CATEGORY_ORDER = { "core", "combat", "panels", "tools" }
-local CATEGORY_LABELS = {
-    core = "SETTINGS_CAT_CORE",
-    combat = "SETTINGS_CAT_COMBAT",
-    panels = "SETTINGS_CAT_PANELS",
-    tools = "SETTINGS_CAT_TOOLS",
+local L, Theme, Widgets = OpenUI.L, OpenUI.Theme, OpenUI.Widgets
+local Settings, panels = {}, {}
+local categories = {
+    { "SETTINGS_CAT_CORE", { "Theme", "Locale", "Profile", "Grid", "Diagnostics" } },
+    { "SETTINGS_CAT_COMBAT", { "ActionBars", "UnitFrames", "CastBars", "Auras", "Nameplates" } },
+    { "SETTINGS_CAT_MAP", { "MinimapUI", "WorldMapUI", "QuestUI" } },
+    { "SETTINGS_CAT_PANELS", { "Bags", "CharUI", "SpellUI", "ProfUI", "Tooltips", "SystemUI", "SpecialUI" } },
+    { "SETTINGS_CAT_SOCIAL", { "Chat", "PartyUI", "SocialUI", "NPCUI", "TradeUI", "AuctionUI" } },
 }
-local DEFAULT_CATEGORY = "panels"
-
-local MODULE_CATEGORY = {
-    Profile = "core", Theme = "core", Locale = "core", Settings = "core",
-    Diagnostics = "core", Media = "core", Grid = "core",
-    ActionBars = "combat", Chat = "combat", UnitFrames = "combat", CastBars = "combat",
-    Auras = "combat", Nameplates = "combat", MinimapUI = "combat",
-    Tooltips = "panels", Bags = "panels", WorldMapUI = "panels", QuestUI = "panels",
-    NPCUI = "panels", CharUI = "panels", SpellUI = "panels", PartyUI = "panels",
-    SocialUI = "panels", TradeUI = "panels", ProfUI = "panels", AuctionUI = "panels",
-    SystemUI = "panels", SpecialUI = "panels",
+local labels = {
+    Theme = "THEME", Locale = "LOCALE", Profile = "PROFILE", Grid = "GRID", Diagnostics = "DIAGNOSTICS",
+    ActionBars = "ACTIONBARS", UnitFrames = "UNITFRAMES", CastBars = "CASTBARS", Auras = "AURAS", Nameplates = "NAMEPLATES",
+    MinimapUI = "MINIMAPUI", WorldMapUI = "WORLDMAPUI", QuestUI = "QUESTUI",
+    Bags = "BAGS", CharUI = "CHARUI", SpellUI = "SPELLUI", ProfUI = "PROFUI", Tooltips = "TOOLTIPS",
+    SystemUI = "SYSTEMUI", SpecialUI = "SPECIALUI", Chat = "CHAT", PartyUI = "PARTYUI",
+    SocialUI = "SOCIALUI", NPCUI = "NPCUI", TradeUI = "TRADEUI", AuctionUI = "AUCTIONUI",
 }
-local MODULE_LABELS = {
-    Profile = "SETTINGS_MOD_PROFILE",
-    Theme = "SETTINGS_MOD_THEME",
-    Locale = "SETTINGS_MOD_LOCALE",
-    Settings = "SETTINGS_MOD_SETTINGS",
-    Diagnostics = "SETTINGS_MOD_DIAGNOSTICS",
-    Media = "SETTINGS_MOD_MEDIA",
-    ActionBars = "SETTINGS_MOD_ACTIONBARS",
-    Chat = "SETTINGS_MOD_CHAT",
-    UnitFrames = "SETTINGS_MOD_UNITFRAMES",
-    CastBars = "SETTINGS_MOD_CASTBARS",
-    Auras = "SETTINGS_MOD_AURAS",
-    Nameplates = "SETTINGS_MOD_NAMEPLATES",
-    MinimapUI = "SETTINGS_MOD_MINIMAPUI",
-    Tooltips = "SETTINGS_MOD_TOOLTIPS",
-    Bags = "SETTINGS_MOD_BAGS",
-    WorldMapUI = "SETTINGS_MOD_WORLDMAPUI",
-    QuestUI = "SETTINGS_MOD_QUESTUI",
-    NPCUI = "SETTINGS_MOD_NPCUI",
-    CharUI = "SETTINGS_MOD_CHARUI",
-    SpellUI = "SETTINGS_MOD_SPELLUI",
-    PartyUI = "SETTINGS_MOD_PARTYUI",
-    SocialUI = "SETTINGS_MOD_SOCIALUI",
-    TradeUI = "SETTINGS_MOD_TRADEUI",
-    ProfUI = "SETTINGS_MOD_PROFUI",
-    AuctionUI = "SETTINGS_MOD_AUCTIONUI",
-    SystemUI = "SETTINGS_MOD_SYSTEMUI",
-    SpecialUI = "SETTINGS_MOD_SPECIALUI",
-    Grid = "SETTINGS_MOD_GRID",
-}
-
-local frame, searchBox, noResultsText
-local scrollFrame, scrollContent
-local contentHeight = 0
-local hubTiles = {}        -- moduleName -> { button, category, edges, bg, label, dot }
-local categorySections = {} -- categoryId -> { frame, header, accent, count }
-local labelRefs = {}       -- { fs, update }
-local modulePanels = {}    -- moduleName -> { build = fn(host) }
-local modWindow, modHost, modTitle
-local currentModule
-
-local function moduleLabel(moduleName)
-    local key = MODULE_LABELS[moduleName]
-    return key and L[key] or moduleName
+local excluded = { Core = true, Settings = true, Media = true }
+local categoryOf = {}
+for i, category in ipairs(categories) do
+    for _, name in ipairs(category[2]) do categoryOf[name] = i end
 end
 
-local function addLabelRef(fs, update)
-    labelRefs[#labelRefs + 1] = { fs = fs, update = update }
+local frame, search, heading, sidebar, content, aboutView, footer, editButton, searchHint
+local selectedCategory, currentModule, about, query = 1, nil, false, ""
+local previousSearch, previousOffset
+local tabs, tiles, pages, localized, paints = {}, {}, {}, {}, {}
+local activePage
+local render
+local PALETTES = { "starblue", "teal", "amber", "amethyst", "rose", "moss", "graphite" }
+
+local function moduleLabel(name)
+    return labels[name] and L["SETTINGS_MOD_" .. labels[name]] or name
+end
+
+local function anchor(obj, parent, x, y)
+    obj:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
+end
+
+local function place(obj, parent, x, y)
+    if obj.ClearAllPoints then obj:ClearAllPoints() end
+    anchor(obj, parent, x, y)
+end
+
+local function paint(texture, token)
+    local color = Theme.Get(token)
+    texture:SetColorTexture(color[1], color[2], color[3], color[4])
+end
+
+local function surface(parent, token)
+    local texture = parent:CreateTexture(nil, "BACKGROUND", nil, -8)
+    texture:SetAllPoints(parent)
+    local function update() paint(texture, token) end
+    paints[#paints + 1] = update
+    update()
+    return texture
+end
+
+local function copyText(parent, value, x, y, w, h, onEnter)
+    local box = CreateFrame("EditBox", nil, parent)
+    box:SetSize(w, h)
+    anchor(box, parent, x, y)
+    box:SetAutoFocus(false)
+    if box.SetFontObject then box:SetFontObject(GameFontHighlight or "GameFontHighlight") end
+    if box.SetTextInsets then box:SetTextInsets(8, 8, 0, 0) end
+    box:SetText(value)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    box:SetScript("OnEnterPressed", onEnter or function(self) self:ClearFocus() end)
+    surface(box, "color.surface-container-high")
+    paints[#paints + 1] = function()
+        local c = Theme.Get("color.on-surface")
+        if box.SetTextColor then box:SetTextColor(c[1], c[2], c[3], c[4]) end
+    end
+    return box
+end
+
+local function text(parent, key, x, y, width, role)
+    local fs = Widgets.Text(parent, L[key], role)
+    anchor(fs, parent, x, y)
+    if width then fs:SetWidth(width) end
+    if fs.SetJustifyH then fs:SetJustifyH("LEFT") end
+    localized[#localized + 1] = function() fs:SetText(L[key]) end
     return fs
 end
 
-local function categoryOrderOf(name)
-    return MODULE_CATEGORY[name] or DEFAULT_CATEGORY
+local function button(parent, key, x, y, width, height, action)
+    local b = Widgets.Button(parent, L[key])
+    b:SetSize(width, height)
+    anchor(b, parent, x, y)
+    b:SetScript("OnClick", action)
+    localized[#localized + 1] = function() b.themedLabel:SetText(L[key]) end
+    return b
 end
 
-function Settings.RegisterModulePanel(moduleName, def)
-    assert(type(moduleName) == "string" and type(def) == "table" and type(def.build) == "function",
-        "invalid module panel: " .. tostring(moduleName))
-    modulePanels[moduleName] = def
+local function selectedButton(parent, title, width, height, action)
+    local b = Widgets.Button(parent, title)
+    b:SetSize(width, height)
+    b:SetScript("OnClick", action)
+    local mark = b:CreateTexture(nil, "ARTWORK")
+    mark:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 1, 1)
+    mark:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 1)
+    mark:SetSize(width - 2, 2)
+    local fill = b:CreateTexture(nil, "BACKGROUND", nil, -7)
+    fill:SetAllPoints(b)
+    paints[#paints + 1] = function()
+        paint(fill, "color.primary-container")
+        paint(mark, "color.primary")
+    end
+    function b:SetSelected(value)
+        local alpha = value and 1 or 0
+        if fill.SetAlpha then fill:SetAlpha(alpha) end
+        if mark.SetAlpha then mark:SetAlpha(alpha) end
+    end
+    b:SetSelected(false)
+    return b
 end
 
--- ==== 卡片磁贴（#71）：边框 + 底色 + 左名右点 + 悬停主色边 ====
-local function tilePaint(tile, hovered)
-    local border = hovered and Theme.Get("color.primary") or Theme.Get("color.outline")
-    local bg = hovered and Theme.Get("color.surface-container-highest")
-        or Theme.Get("color.surface-container-high")
-    if tile.bg and type(tile.bg.SetColorTexture) == "function" and bg then
-        tile.bg:SetColorTexture(bg[1], bg[2], bg[3], 0.95)
+local function scrollView(parent, x, y, width, height, name)
+    local scroll = CreateFrame("ScrollFrame", name, parent)
+    anchor(scroll, parent, x, y)
+    scroll:SetSize(width - 12, height)
+    local child = CreateFrame("Frame", nil, scroll)
+    child:SetSize(width - 12, height)
+    if scroll.SetScrollChild then scroll:SetScrollChild(child) end
+
+    local slider = CreateFrame("Slider", nil, parent)
+    anchor(slider, parent, x + width - 8, y)
+    slider:SetSize(8, height)
+    surface(slider, "color.surface-container-high")
+    local thumb = slider:CreateTexture(nil, "ARTWORK")
+    thumb:SetSize(6, 44)
+    if slider.SetOrientation then slider:SetOrientation("VERTICAL") end
+    if slider.SetThumbTexture then slider:SetThumbTexture(thumb) end
+    if slider.EnableMouse then slider:EnableMouse(true) end
+    paints[#paints + 1] = function() paint(thumb, "color.outline") end
+
+    local view = { frame = scroll, child = child, slider = slider, offset = 0, range = 0 }
+    function view:SetOffset(offset, fromSlider)
+        self.offset = math.max(0, math.min(self.range, offset))
+        if scroll.SetVerticalScroll then scroll:SetVerticalScroll(self.offset) end
+        if not fromSlider and slider.SetValue then slider:SetValue(self.range - self.offset) end
     end
-    for _, edge in ipairs(tile.edges or {}) do
-        if type(edge.SetColorTexture) == "function" and border then
-            edge:SetColorTexture(border[1], border[2], border[3], hovered and 1.0 or 0.85)
-        end
+    function view:SetHeight(size, offset)
+        self.range = math.max(0, size - height)
+        child:SetSize(width - 12, math.max(size, height))
+        if slider.SetMinMaxValues then slider:SetMinMaxValues(0, math.max(1, self.range)) end
+        thumb:SetSize(6, math.max(22, height * height / math.max(size, height)))
+        if self.range > 0 then slider:Show() else slider:Hide() end
+        self:SetOffset(offset or 0)
     end
+    function view:SetShown(shown)
+        if shown then scroll:Show() else scroll:Hide() end
+        if shown and self.range > 0 then slider:Show() else slider:Hide() end
+    end
+    slider:SetScript("OnValueChanged", function(_, value) view:SetOffset(view.range - value, true) end)
+    if scroll.EnableMouseWheel then scroll:EnableMouseWheel(true) end
+    scroll:SetScript("OnMouseWheel", function(_, delta) view:SetOffset(view.offset - delta * 36) end)
+    return view
 end
 
-local function buildTile(parent, name, category)
-    local tile = CreateFrame("Button", nil, parent)
-    tile:SetSize(TILE_W, TILE_H)
-
-    local bg = tile:CreateTexture(nil, "BACKGROUND", nil, -8)
-    bg:SetAllPoints(tile)
-
-    local label = tile:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    label:SetPoint("LEFT", tile, "LEFT", 10, 0)
-    if type(label.SetJustifyH) == "function" then label:SetJustifyH("LEFT") end
-    if type(label.SetShadowOffset) == "function" then
-        label:SetShadowOffset(1, -1)
-        if type(label.SetShadowColor) == "function" then label:SetShadowColor(0, 0, 0, 0.9) end
-    end
-    label:SetText(moduleLabel(name))
-
-    local dot = tile:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    dot:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
-    dot:SetText("○")
-
-    local edges = {}
-    if Widgets.Edge then
-        local border = Theme.Get("color.outline")
-        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-            local e = Widgets.Edge(tile, side, border, 0.85)
-            if e then edges[#edges + 1] = e end
-        end
-    end
-
-    local entry = {
-        button = tile, category = category, edges = edges, bg = bg,
-        label = label, dot = dot,
-    }
-    tile.themedLabel = label -- 兼容既有测试/检索
-
-    tile:SetScript("OnEnter", function() tilePaint(entry, true) end)
-    tile:SetScript("OnLeave", function() tilePaint(entry, false) end)
-    tile:SetScript("OnClick", function() Settings.OpenModule(name) end)
-
-    tilePaint(entry, false)
-    return entry
-end
-
-local function refreshTileStates()
-    for name, tile in pairs(hubTiles) do
-        local enabled = OpenUI:IsModuleEnabled(name)
-        tile.label:SetText(moduleLabel(name))
-        local state = enabled and "●" or "○"
-        local color = enabled and Theme.Get("color.primary") or Theme.Get("color.outline")
-        tile.dot:SetText(state)
-        if type(tile.dot.SetTextColor) == "function" and color then
-            tile.dot:SetTextColor(color[1], color[2], color[3], 1)
-        end
-        tile.label:SetAlpha(enabled and 1.0 or 0.55)
-    end
-end
-
--- ==== 模块小窗（#71：标题带 + 主色强调条 + 方形关闭钮） ====
-local function buildModuleWindow()
-    if modWindow then return end
-    modWindow = Widgets.Panel(UIParent, { name = "OpenUIModuleSettings" })
-    modWindow:SetSize(MODULE_W, MODULE_H)
-    modWindow:SetPoint("LEFT", frame, "RIGHT", 12, 0)
-    modWindow:SetMovable(true)
-    modWindow:EnableMouse(true)
-    modWindow:RegisterForDrag("LeftButton")
-    modWindow:SetScript("OnDragStart", modWindow.StartMoving)
-    modWindow:SetScript("OnDragStop", modWindow.StopMovingOrSizing)
-
-    -- 标题带：深色底 + 左侧 3px 主色条
-    local barBg = modWindow:CreateTexture(nil, "BACKGROUND", nil, -8)
-    barBg:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 0, 0)
-    barBg:SetPoint("TOPRIGHT", modWindow, "TOPRIGHT", 0, 0)
-    if type(barBg.SetHeight) == "function" then barBg:SetHeight(38) end
-    local barColor = Theme.Get("color.surface-container-highest")
-    if barColor then barBg:SetColorTexture(barColor[1], barColor[2], barColor[3], 0.95) end
-
-    local accent = modWindow:CreateTexture(nil, "OVERLAY", nil, 7)
-    accent:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 0, 0)
-    accent:SetPoint("BOTTOMLEFT", barBg, "BOTTOMLEFT", 0, 0)
-    if type(accent.SetWidth) == "function" then accent:SetWidth(3) end
-    local primary = Theme.Get("color.primary")
-    if primary then accent:SetColorTexture(primary[1], primary[2], primary[3], 1) end
-
-    modTitle = modWindow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    modTitle:SetPoint("LEFT", accent, "RIGHT", 10, 0)
-    if type(modTitle.SetJustifyH) == "function" then modTitle:SetJustifyH("LEFT") end
-    if type(modTitle.SetShadowOffset) == "function" then
-        modTitle:SetShadowOffset(1, -1)
-        if type(modTitle.SetShadowColor) == "function" then
-            modTitle:SetShadowColor(0, 0, 0, 0.9)
-        end
-    end
-    addLabelRef(modTitle, function()
-        modTitle:SetText(currentModule and moduleLabel(currentModule) or "")
-    end)
-
-    -- 方形关闭钮（×）
-    local closeBtn = CreateFrame("Button", nil, modWindow)
-    closeBtn:SetSize(26, 26)
-    closeBtn:SetPoint("TOPRIGHT", modWindow, "TOPRIGHT", -8, -6)
-    local closeBg = closeBtn:CreateTexture(nil, "BACKGROUND", nil, -8)
-    closeBg:SetAllPoints(closeBtn)
-    local cbColor = Theme.Get("color.surface-container-high")
-    if cbColor then closeBg:SetColorTexture(cbColor[1], cbColor[2], cbColor[3], 0.95) end
-    if Widgets.Edge then
-        local border = Theme.Get("color.outline")
-        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-            Widgets.Edge(closeBtn, side, border, 0.85)
-        end
-    end
-    local closeLabel = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    closeLabel:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
-    closeLabel:SetText("×")
-    closeBtn:SetScript("OnClick", function() Settings.CloseModule() end)
-    closeBtn.themedLabel = closeLabel
-
-    -- 底部分隔线
-    if Widgets.Edge then
-        Widgets.Edge(modWindow, "top", Theme.Get("color.outline"), 0.6, barBg)
-    end
-
-    local toggle = Widgets.Toggle(modWindow, "SETTINGS_MODULE_TOGGLE",
-        function() return currentModule and OpenUI:IsModuleEnabled(currentModule) end,
-        function(want)
-            if not currentModule then return end
-            if currentModule == "Core" then return end
-            if want then
-                OpenUI:EnableModule(currentModule)
-            else
-                OpenUI:DisableModule(currentModule)
-            end
-            refreshTileStates()
-        end)
-    toggle:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 14, -46)
-    toggle:SetSize(210, 24)
-
-    if type(UISpecialFrames) == "table" then
-        table.insert(UISpecialFrames, "OpenUIModuleSettings")
+function Settings.RegisterModulePanel(name, panel)
+    if type(name) == "string" and type(panel) == "table" and type(panel.build) == "function" then
+        panels[name] = panel
     end
 end
 
-local function clearModuleHost()
-    if modHost then
-        modHost:Hide()
-        modHost = nil
-    end
-end
-
-local function buildModuleHost()
-    modHost = CreateFrame("Frame", nil, modWindow)
-    modHost:SetPoint("TOPLEFT", modWindow, "TOPLEFT", 14, -80)
-    modHost:SetSize(MODULE_W - 28, MODULE_H - 94)
-end
-
--- ==== 内建模块面板 ====
-local function buildThemePanel(host)
-    local names = { "starblue", "teal", "amber", "amethyst", "rose", "moss", "graphite" }
+local function buildTheme(host)
+    text(host, "SETTINGS_PALETTE", 0, 0, 430, "title")
     local buttons = {}
-    local function mark()
-        local cur = Theme.GetPalette()
-        for i, name in ipairs(names) do
-            buttons[i].themedLabel:SetText(((name == cur) and "● " or "  ") .. name)
+    for i, name in ipairs(PALETTES) do
+        local x, y = ((i - 1) % 2) * 231, 31 + math.floor((i - 1) / 2) * 46
+        local b = selectedButton(host, "", 221, 38, function() Theme.SetPalette(name) end)
+        anchor(b, host, x, y)
+        local swatch = b:CreateTexture(nil, "ARTWORK")
+        swatch:SetSize(11, 11)
+        swatch:SetPoint("LEFT", b, "LEFT", 12, 0)
+        local color = Theme.GetPaletteColor(name)
+        swatch:SetColorTexture(color[1], color[2], color[3], 1)
+        buttons[i] = b
+    end
+    return function()
+        local selected = Theme.GetPalette()
+        for i, name in ipairs(PALETTES) do
+            buttons[i].themedLabel:SetText(L["SETTINGS_PALETTE_" .. name])
+            buttons[i]:SetSelected(selected == name)
         end
     end
-    for i, name in ipairs(names) do
-        local btn = Widgets.Button(host, name)
-        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 30)
-        btn:SetSize(190, 26)
-        btn:SetScript("OnClick", function()
-            Theme.SetPalette(name)
-            mark()
-        end)
-        buttons[i] = btn
-    end
-    mark()
 end
 
-local function buildLocalePanel(host)
-    local choices = { { id = "auto", labelKey = "SETTINGS_LOCALE_AUTO" },
-                      { id = "enUS", label = "enUS" }, { id = "zhCN", label = "zhCN" } }
+local function buildLocale(host)
+    text(host, "SETTINGS_LOCALE", 0, 0, 430, "title")
+    local options = { { "auto", "SETTINGS_LOCALE_AUTO" }, { "zhCN", "SETTINGS_LANG_ZH" }, { "enUS", "SETTINGS_LANG_EN" } }
     local buttons = {}
-    local function mark()
-        local cur = Locale.Get()
-        for i, choice in ipairs(choices) do
-            local label = choice.label or L[choice.labelKey]
-            buttons[i].themedLabel:SetText(((choice.id == cur) and "● " or "  ") .. label)
+    for i, option in ipairs(options) do
+        local b = selectedButton(host, "", 450, 36, function() OpenUI.Locale.Set(option[1]) end)
+        anchor(b, host, 0, 32 + (i - 1) * 44)
+        buttons[i] = b
+    end
+    return function()
+        for i, option in ipairs(options) do
+            buttons[i].themedLabel:SetText(L[option[2]])
+            buttons[i]:SetSelected(OpenUI.Locale.Get() == option[1])
         end
     end
-    for i, choice in ipairs(choices) do
-        local btn = Widgets.Button(host, choice.label or L[choice.labelKey])
-        btn:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -(i - 1) * 30)
-        btn:SetSize(190, 26)
-        btn:SetScript("OnClick", function()
-            Locale.Set(choice.id)
-            mark()
-            Settings.Refresh()
-        end)
-        buttons[i] = btn
-    end
-    mark()
 end
 
-local function buildDiagnosticsPanel(host)
-    local count = Widgets.Text(host, L.SETTINGS_ERRORS_COUNT:format(#OpenUI.Diagnose.Errors()), "body")
-    count:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -4)
-    addLabelRef(count, function()
-        count:SetText(L.SETTINGS_ERRORS_COUNT:format(#OpenUI.Diagnose.Errors()))
-    end)
-    local open = Widgets.Button(host, L.SETTINGS_DIAG_OPEN)
-    open:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -34)
-    open:SetSize(190, 26)
-    open:SetScript("OnClick", function()
+local function buildDiagnostics(host)
+    local count = Widgets.Text(host, "")
+    anchor(count, host, 0, 0)
+    button(host, "SETTINGS_DIAG_OPEN", 0, 32, 175, 32, function()
         if OpenUI.Diagnostics then OpenUI.Diagnostics.Open() end
     end)
-    addLabelRef(open.themedLabel, function() open.themedLabel:SetText(L.SETTINGS_DIAG_OPEN) end)
+    return function() count:SetText(L.SETTINGS_ERRORS_COUNT:format(#OpenUI.Diagnose.Errors())) end
 end
 
-local function buildMediaPanel(host)
-    local info = Widgets.Text(host, L.SETTINGS_MEDIA_INFO, "body")
-    info:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -4)
-    info:SetWidth(MODULE_W - 40)
-    addLabelRef(info, function() info:SetText(L.SETTINGS_MEDIA_INFO) end)
-end
+local function buildProfiles(host)
+    local profile = OpenUI.Profile
+    local list = CreateFrame("Frame", nil, host)
+    list:SetAllPoints(host)
+    local confirm = CreateFrame("Frame", nil, host)
+    confirm:SetAllPoints(host)
+    confirm:Hide()
+    local mode, pendingSlot, operation
+    local current = Widgets.Text(list, "")
+    anchor(current, list, 0, 23)
+    local prompt = Widgets.Text(confirm, "", "title")
+    anchor(prompt, confirm, 0, 12)
+    prompt:SetWidth(450)
+    local note = Widgets.Text(confirm, "")
+    anchor(note, confirm, 0, 64)
+    note:SetWidth(450)
 
-local function buildSettingsPanel(host)
-    local hint = Widgets.Text(host, L.SETTINGS_HINT, "body")
-    hint:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -4)
-    addLabelRef(hint, function() hint:SetText(L.SETTINGS_HINT) end)
-end
-
-Settings.RegisterModulePanel("Theme", { build = buildThemePanel })
-Settings.RegisterModulePanel("Locale", { build = buildLocalePanel })
-Settings.RegisterModulePanel("Diagnostics", { build = buildDiagnosticsPanel })
-Settings.RegisterModulePanel("Media", { build = buildMediaPanel })
-Settings.RegisterModulePanel("Settings", { build = buildSettingsPanel })
-
-local function buildGenericPanel(host)
-    local hint = Widgets.Text(host, L.SETTINGS_MODULE_NO_OPTIONS, "body")
-    hint:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -4)
-    hint:SetWidth(MODULE_W - 40)
-    addLabelRef(hint, function() hint:SetText(L.SETTINGS_MODULE_NO_OPTIONS) end)
-end
-
--- ==== 总览正文（滚动内容：类目分区 × 卡片磁贴） ====
-local function buildHub()
-    local y = 0
-    local contentW = WINDOW_W - 32
-    for _, category in ipairs(CATEGORY_ORDER) do
-        local modules = {}
+    local function closePrompt()
+        confirm:Hide()
+        list:Show()
+        pendingSlot, operation = nil, nil
+    end
+    local function apply(action)
+        if not OpenUI:CanModifyNow() then return end
+        if OpenUI.EditMode and OpenUI.EditMode.IsActive() then OpenUI.EditMode.Toggle() end
+        local previous = {}
         for _, module in ipairs(OpenUI.moduleOrder) do
-            if module.name ~= "Core" and categoryOrderOf(module.name) == category then
-                modules[#modules + 1] = module.name
+            previous[module.name] = OpenUI:IsModuleEnabled(module.name)
+        end
+        if not action() then return end
+        closePrompt()
+        Theme.Refresh()
+        OpenUI.Locale.Refresh()
+        OpenUI:RefreshProfileModules(previous)
+        if OpenUI.Grid then OpenUI.Grid.RefreshProfile() end
+        Settings.Refresh()
+    end
+    local copy = button(confirm, "SETTINGS_PROFILE_COPY", 0, 128, 166, 30, function()
+        apply(function() return profile.UseIndependent({ copy = true }) end)
+    end)
+    local restore = button(confirm, "SETTINGS_PROFILE_RESTORE", 174, 128, 158, 30, function()
+        apply(function() return profile.UseIndependent() end)
+    end)
+    local delete = button(confirm, "SETTINGS_PROFILE_DELETE", 0, 128, 166, 30, function()
+        if operation == "delete" then apply(function() return profile.DeleteSlot(pendingSlot) end) end
+    end)
+    button(confirm, "SETTINGS_PROFILE_CANCEL", 340, 128, 110, 30, closePrompt)
+    local function openPrompt(kind, slot)
+        if not OpenUI:CanModifyNow() then return end
+        pendingSlot, operation = slot, kind
+        if kind == "delete" then
+            prompt:SetText(L.SETTINGS_PROFILE_DELETE_TITLE:format(slot))
+            note:SetText(L.SETTINGS_PROFILE_DELETE_NOTE)
+            copy:Hide()
+            restore:Hide()
+            delete:Show()
+        else
+            prompt:SetText(L.SETTINGS_PROFILE_UNLINK_TITLE:format(slot))
+            note:SetText(L.SETTINGS_PROFILE_UNLINK_NOTE)
+            copy:Show()
+            restore:Show()
+            delete:Hide()
+        end
+        list:Hide()
+        confirm:Show()
+    end
+
+    text(list, "SETTINGS_PROFILE_CHARACTER", 0, 0, 260, "title")
+    local unlink = button(list, "SETTINGS_PROFILE_UNLINK", 310, 6, 140, 29, function()
+        if mode and mode.slot then openPrompt("unlink", mode.slot) end
+    end)
+    text(list, "SETTINGS_PROFILE_ACCOUNT", 0, 53, 215, "title")
+    text(list, "SETTINGS_PROFILE_SHARED_NOTE", 220, 55, 230)
+    local rows = {}
+    for i = 1, 5 do
+        local slot = i
+        local row = CreateFrame("Frame", nil, list)
+        anchor(row, list, 0, 80 + (i - 1) * 36)
+        row:SetSize(452, 32)
+        surface(row, "color.surface-container-high")
+        local name = Widgets.Text(row, "")
+        local status = Widgets.Text(row, "")
+        anchor(name, row, 9, 8)
+        anchor(status, row, 156, 8)
+        name:SetWidth(143)
+        status:SetWidth(105)
+        local use = Widgets.Button(row, "")
+        anchor(use, row, 269, 3)
+        use:SetSize(111, 26)
+        use:SetScript("OnClick", function() apply(function() return profile.UseSlot(slot) end) end)
+        local remove = button(row, "SETTINGS_PROFILE_DELETE", 385, 3, 64, 26, function()
+            openPrompt("delete", slot)
+        end)
+        rows[i] = { name = name, status = status, use = use, remove = remove }
+    end
+    text(list, "SETTINGS_PROFILE_RELOAD", 0, 268, 445)
+    return function()
+        mode = profile.GetCurrent()
+        current:SetText(mode.slot and L.SETTINGS_PROFILE_LINKED:format(mode.slot) or L.SETTINGS_PROFILE_INDEPENDENT)
+        if mode.slot then unlink:Show() else unlink:Hide() end
+        for i, slot in ipairs(profile.Slots()) do
+            local row = rows[i]
+            local selected = mode.slot == i
+            row.name:SetText(L.SETTINGS_PROFILE_SLOT:format(i))
+            row.status:SetText(selected and L.SETTINGS_PROFILE_ACTIVE
+                or slot.used and L.SETTINGS_PROFILE_USED or L.SETTINGS_PROFILE_EMPTY)
+            row.use.themedLabel:SetText(slot.used and L.SETTINGS_PROFILE_USE or L.SETTINGS_PROFILE_CREATE)
+            if selected then row.use:Hide() else row.use:Show() end
+            if slot.used then row.remove:Show() else row.remove:Hide() end
+        end
+    end, closePrompt
+end
+
+Settings.RegisterModulePanel("Theme", { build = buildTheme, height = 228 })
+Settings.RegisterModulePanel("Locale", { build = buildLocale, height = 180 })
+Settings.RegisterModulePanel("Diagnostics", { build = buildDiagnostics })
+Settings.RegisterModulePanel("Profile", { build = buildProfiles, height = 300 })
+
+local function buildAbout(parent)
+    text(parent, "SETTINGS_ABOUT", 0, 0, 640, "title")
+    text(parent, "SETTINGS_ABOUT_INTRO", 0, 38, 630)
+    text(parent, "SETTINGS_ABOUT_START", 0, 111, 620, "title")
+    text(parent, "SETTINGS_ABOUT_GUIDE", 0, 143, 630)
+    text(parent, "SETTINGS_ABOUT_MEDIA", 0, 225, 620, "title")
+    text(parent, "SETTINGS_ABOUT_BRIDGE", 0, 257, 630)
+    text(parent, "SETTINGS_ABOUT_PROJECT", 0, 336, 620, "title")
+    text(parent, "SETTINGS_ABOUT_AUTHOR", 0, 365, 620)
+    local links = {
+        { "SETTINGS_ABOUT_CONTACT", "askdaddy@gmail.com" },
+        { "SETTINGS_ABOUT_REPO", "https://github.com/askdaddy/OpenUI" },
+        { "SETTINGS_ABOUT_ISSUES", "https://github.com/askdaddy/OpenUI/issues" },
+    }
+    for i, entry in ipairs(links) do
+        local y = 392 + (i - 1) * 37
+        text(parent, entry[1], 0, y + 7, 138)
+        local value = entry[2]
+        local box = copyText(parent, value, 145, y, 490, 30)
+        box:SetScript("OnEditFocusGained", function(self) if self.HighlightText then self:HighlightText() end end)
+        box:SetScript("OnTextChanged", function(self, userInput)
+            if userInput and self:GetText() ~= value then
+                self:SetText(value)
+                if self.HighlightText then self:HighlightText() end
+            end
+        end)
+    end
+    text(parent, "SETTINGS_ABOUT_COPY", 145, 509, 490)
+    return 536
+end
+
+local function pageFor(name)
+    if pages[name] then return pages[name] end
+    local panel = panels[name]
+    local host = CreateFrame("Frame", nil, content.child)
+    host:SetSize(460, (panel and panel.height) or 220)
+    anchor(host, content.child, 0, 56)
+    local page = { host = host, size = ((panel and panel.height) or 220) + 62 }
+    if panel then
+        page.refresh, page.reset = panel.build(host)
+    else
+        text(host, "SETTINGS_MODULE_NO_OPTIONS", 0, 0, 450)
+    end
+    pages[name] = page
+    return page
+end
+
+local function selectModule(name)
+    if not name or not OpenUI.modules[name] or excluded[name] then return end
+    currentModule = name
+    selectedCategory = categoryOf[name] or 4
+    render(true)
+end
+
+local function matches(name, category)
+    return query == "" or moduleLabel(name):lower():find(query, 1, true)
+        or L[categories[category][1]]:lower():find(query, 1, true)
+end
+
+local function results(category)
+    local result = {}
+    for _, name in ipairs(categories[category][2]) do
+        if OpenUI.modules[name] and matches(name, category) then result[#result + 1] = name end
+    end
+    if category == 4 then
+        for _, mod in ipairs(OpenUI.moduleOrder) do
+            local name = mod.name
+            if not categoryOf[name] and not excluded[name] and matches(name, category) then
+                result[#result + 1] = name
             end
         end
-        if #modules > 0 then
-            -- 分区容器（独立 Frame，便于整段隐藏）
-            local section = CreateFrame("Frame", nil, scrollContent)
-            section:SetSize(contentW, SECTION_HEAD_H)
+    end
+    return result
+end
 
-            -- 主色竖条 + 类目标题 + 计数
-            local accent = section:CreateTexture(nil, "OVERLAY", nil, 7)
-            accent:SetPoint("TOPLEFT", section, "TOPLEFT", 0, -2)
-            if type(accent.SetWidth) == "function" then accent:SetWidth(3) end
-            if type(accent.SetHeight) == "function" then accent:SetHeight(16) end
-            local primary = Theme.Get("color.primary")
-            if primary then accent:SetColorTexture(primary[1], primary[2], primary[3], 1) end
+local function selectCategory(index)
+    local names = results(index)
+    if #names > 0 then
+        selectModule(names[1])
+    else
+        selectedCategory, currentModule = index, nil
+        render(true)
+    end
+end
 
-            local header = section:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            header:SetPoint("LEFT", accent, "RIGHT", 8, 0)
-            if type(header.SetJustifyH) == "function" then header:SetJustifyH("LEFT") end
-            if type(header.SetShadowOffset) == "function" then
-                header:SetShadowOffset(1, -1)
-                if type(header.SetShadowColor) == "function" then
-                    header:SetShadowColor(0, 0, 0, 0.9)
-                end
-            end
-            header:SetText(L[CATEGORY_LABELS[category]])
-            addLabelRef(header, function() header:SetText(L[CATEGORY_LABELS[category]]) end)
+local function addTile(name)
+    local b = selectedButton(sidebar.child, moduleLabel(name), 164, 35, function() selectModule(name) end)
+    if b.themedLabel.ClearAllPoints then b.themedLabel:ClearAllPoints() end
+    b.themedLabel:SetPoint("LEFT", b, "LEFT", 9, 0)
+    local dot
+    if not OpenUI.modules[name].alwaysEnabled then
+        dot = Widgets.Text(b, "")
+        dot:SetPoint("RIGHT", b, "RIGHT", -10, 0)
+    end
+    local tile = { button = b, dot = dot }
+    tiles[name] = tile
+    return tile
+end
 
-            local count = section:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            count:SetPoint("LEFT", header, "RIGHT", 8, 0)
-            count:SetText(tostring(#modules))
-
-            -- 磁贴网格
-            local col, row = 0, 0
-            local rows = 0
-            for _, name in ipairs(modules) do
-                local tile = buildTile(section, name, category)
-                tile.button:SetPoint("TOPLEFT", section, "TOPLEFT",
-                    col * (TILE_W + TILE_GAP), -SECTION_HEAD_H - row * (TILE_H + TILE_GAP))
-                hubTiles[name] = tile
-                col = col + 1
-                if col >= TILE_COLS then
-                    col, row = 0, row + 1
-                end
-            end
-            rows = row + ((col > 0) and 1 or 0)
-
-            local sectionH = SECTION_HEAD_H + rows * (TILE_H + TILE_GAP)
-            section:SetSize(contentW, sectionH)
-            section:SetPoint("TOPLEFT", scrollContent, "TOPLEFT", 0, y)
-            categorySections[category] = { frame = section, header = header, accent = accent }
-            y = y - sectionH - SECTION_GAP
+local function refreshChrome()
+    for _, apply in ipairs(paints) do apply() end
+    for _, tile in pairs(tiles) do
+        if tile.dot then
+            local name = tile.name
+            local enabled = OpenUI:IsModuleEnabled(name)
+            local c = Theme.Get(enabled and "color.primary" or "color.on-surface-variant")
+            tile.dot:SetText(enabled and "●" or "○")
+            tile.dot:SetTextColor(c[1], c[2], c[3], c[4])
         end
     end
-    contentHeight = -y
-    scrollContent:SetSize(contentW, math.max(contentHeight, 10))
-    if type(scrollFrame.SetScrollChild) == "function" then
-        scrollFrame:SetScrollChild(scrollContent)
+    if activePage and activePage.refresh then activePage.refresh() end
+end
+
+local moduleSwitch, aboutTabs, normalTabs, sideSurface
+render = function(resetScroll)
+    if not frame then return end
+    local offset = resetScroll and 0 or content.offset
+    if about then
+        normalTabs:Hide()
+        aboutTabs:Show()
+        search:Hide()
+        searchHint:Hide()
+        editButton:Hide()
+        sideSurface:Hide()
+        sidebar:SetShown(false)
+        content:SetShown(false)
+        aboutView:SetShown(true)
+        footer:Hide()
+        return
     end
+    normalTabs:Show()
+    aboutTabs:Hide()
+    search:Show()
+    if query == "" and not (search.HasFocus and search:HasFocus()) then searchHint:Show()
+    else searchHint:Hide() end
+    editButton:Show()
+    sideSurface:Show()
+    sidebar:SetShown(true)
+    content:SetShown(true)
+    aboutView:SetShown(false)
+    footer:Show()
+    for i, tab in ipairs(tabs) do
+        tab.themedLabel:SetText(L[categories[i][1]])
+        tab:SetSelected(i == selectedCategory)
+    end
+    for _, tile in pairs(tiles) do tile.button:Hide() end
+    local visible = results(selectedCategory)
+    for i, name in ipairs(visible) do
+        local tile = tiles[name] or addTile(name)
+        tile.name = name
+        tile.button.themedLabel:SetText(moduleLabel(name))
+        place(tile.button, sidebar.child, 0, (i - 1) * 42)
+        tile.button:SetSelected(name == currentModule)
+        tile.button:Show()
+    end
+    sidebar:SetHeight(#visible * 42)
+    local nextPage = currentModule and pageFor(currentModule)
+    if activePage and activePage ~= nextPage then
+        if activePage.reset then activePage.reset() end
+        activePage.host:Hide()
+    end
+    activePage = nextPage
+    heading:SetText(currentModule and moduleLabel(currentModule) or L.SETTINGS_NO_RESULTS)
+    if currentModule and not OpenUI.modules[currentModule].alwaysEnabled then moduleSwitch:Show()
+    else moduleSwitch:Hide() end
+    if activePage then activePage.host:Show() end
+    content:SetHeight(activePage and activePage.size or 0, offset)
+    refreshChrome()
+    Widgets.Refresh()
+end
+
+local function openAbout()
+    previousOffset = content.offset
+    if search.ClearFocus then search:ClearFocus() end
+    about = true
+    aboutView:SetHeight(aboutView.bodyHeight)
+    render()
+end
+
+function Settings.ReturnFromAbout()
+    if not about then return end
+    about = false
+    render()
+    content:SetOffset(previousOffset or 0)
 end
 
 local function build()
     if frame then return end
     frame = Widgets.Panel(UIParent, { name = "OpenUISettings" })
-    frame:SetSize(WINDOW_W, WINDOW_H)
+    frame:SetSize(700, 520)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-
-    -- ==== 页眉（固定） ====
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -14)
-    if type(title.SetJustifyH) == "function" then title:SetJustifyH("LEFT") end
-    if type(title.SetShadowOffset) == "function" then
-        title:SetShadowOffset(1, -1)
-        if type(title.SetShadowColor) == "function" then title:SetShadowColor(0, 0, 0, 0.9) end
-    end
-    title:SetText(L.SETTINGS_TITLE)
-    addLabelRef(title, function() title:SetText(L.SETTINGS_TITLE) end)
-
-    local close = Widgets.Button(frame, L.SETTINGS_CLOSE)
-    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -10)
-    close:SetSize(72, 24)
-    close:SetScript("OnClick", function() Settings.Close() end)
-    addLabelRef(close.themedLabel, function() close.themedLabel:SetText(L.SETTINGS_CLOSE) end)
-
-    local editButton = Widgets.Button(frame, L.SETTINGS_EDIT_MODE)
-    editButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -96, -10)
-    editButton:SetSize(96, 24)
-    editButton:SetScript("OnClick", function()
-        if OpenUI.EditMode then
-            OpenUI.EditMode.Toggle()
-            editButton.themedLabel:SetText(
-                (OpenUI.EditMode.IsActive() and "● " or "") .. L.SETTINGS_EDIT_MODE)
-        end
+    local header = CreateFrame("Frame", nil, frame)
+    anchor(header, frame, 1, 1)
+    header:SetSize(698, 108)
+    surface(header, "color.surface-container-high")
+    text(header, "SETTINGS_TITLE", 19, 17, 195, "title")
+    button(header, "SETTINGS_CLOSE_SHORT", 640, 16, 39, 34, function() Settings.Close() end)
+    editButton = button(header, "SETTINGS_EDIT_MODE", 512, 16, 112, 34, function()
+        if OpenUI.EditMode then OpenUI.EditMode.Toggle() end
+        Settings.Refresh()
     end)
-    addLabelRef(editButton.themedLabel, function()
-        local marker = (OpenUI.EditMode and OpenUI.EditMode.IsActive()) and "● " or ""
-        editButton.themedLabel:SetText(marker .. L.SETTINGS_EDIT_MODE)
-    end)
+    search = copyText(header, "", 220, 16, 280, 34)
+    searchHint = text(search, "SETTINGS_SEARCH", 8, 8, 260)
+    search:SetScript("OnTextChanged", function(self) Settings.ApplyFilter(self:GetText()) end)
+    search:SetScript("OnEditFocusGained", function() searchHint:Hide() end)
+    search:SetScript("OnEditFocusLost", function() if query == "" then searchHint:Show() end end)
 
-    -- 搜索框（带底与边）
-    searchBox = CreateFrame("EditBox", nil, frame)
-    searchBox:SetAutoFocus(false)
-    searchBox:SetText("")
-    searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 230, -12)
-    searchBox:SetSize(280, 24)
-    if type(searchBox.SetFontObject) == "function" and type(GameFontHighlight) == "table" then
-        searchBox:SetFontObject(GameFontHighlight)
+    normalTabs = CreateFrame("Frame", nil, header)
+    normalTabs:SetAllPoints(header)
+    for i, category in ipairs(categories) do
+        local index = i
+        local tab = selectedButton(normalTabs, L[category[1]], 123, 41, function() selectCategory(index) end)
+        anchor(tab, normalTabs, 20 + (i - 1) * 132, 67)
+        tabs[i] = tab
     end
-    local textColor = Theme.Get("color.on-surface")
-    if type(searchBox.SetTextColor) == "function" and type(textColor) == "table" then
-        searchBox:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
-    end
-    if type(searchBox.SetTextInsets) == "function" then
-        searchBox:SetTextInsets(8, 8, 0, 0)
-    end
-    local searchBg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
-    searchBg:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -2, 2)
-    searchBg:SetPoint("BOTTOMRIGHT", searchBox, "BOTTOMRIGHT", 2, -2)
-    local sc = Theme.Get("color.surface-container-high")
-    if sc then searchBg:SetColorTexture(sc[1], sc[2], sc[3], 0.95) end
-    if Widgets.Edge then
-        local border = Theme.Get("color.outline")
-        for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-            Widgets.Edge(searchBox, side, border, 0.85, searchBox)
-        end
-    end
-    searchBox:SetScript("OnTextChanged", function(self)
-        Settings.ApplyFilter(self:GetText())
-    end)
-    searchBox:SetScript("OnMouseDown", function(self) self:SetFocus() end)
-    searchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    aboutTabs = CreateFrame("Frame", nil, header)
+    aboutTabs:SetAllPoints(header)
+    local tab = selectedButton(aboutTabs, "", 143, 41, nil)
+    anchor(tab, aboutTabs, 20, 67)
+    tab:SetSelected(true)
+    localized[#localized + 1] = function() tab.themedLabel:SetText(L.SETTINGS_ABOUT) end
+    button(aboutTabs, "SETTINGS_ABOUT_RETURN", 175, 67, 90, 41, Settings.ReturnFromAbout)
 
-    -- 页眉分隔线
-    local divider = frame:CreateTexture(nil, "OVERLAY", nil, 7)
-    divider:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -HEADER_H)
-    divider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -HEADER_H)
-    if type(divider.SetHeight) == "function" then divider:SetHeight(1) end
-    local outline = Theme.Get("color.outline")
-    if outline then divider:SetColorTexture(outline[1], outline[2], outline[3], 0.6) end
-
-    -- ==== 正文（滚动） ====
-    scrollFrame = CreateFrame("ScrollFrame", nil, frame)
-    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -(HEADER_H + 8))
-    scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, FOOTER_H)
-    if type(scrollFrame.EnableMouseWheel) == "function" then
-        scrollFrame:EnableMouseWheel(true)
-        scrollFrame:SetScript("OnMouseWheel", function(self, delta)
-            local range = (type(self.GetVerticalScrollRange) == "function"
-                and self:GetVerticalScrollRange()) or 0
-            local current = (type(self.GetVerticalScroll) == "function"
-                and self:GetVerticalScroll()) or 0
-            local target = current - delta * 40
-            if type(self.SetVerticalScroll) == "function" then
-                self:SetVerticalScroll(math.max(0, math.min(range, target)))
-            end
+    sideSurface = CreateFrame("Frame", nil, frame)
+    anchor(sideSurface, frame, 1, 110)
+    sideSurface:SetSize(192, 370)
+    surface(sideSurface, "color.surface-container-low")
+    sidebar = scrollView(sideSurface, 11, 13, 180, 344, "OpenUISettingsModules")
+    content = scrollView(frame, 216, 125, 480, 341, "OpenUISettingsContent")
+    local rule = content.child:CreateTexture(nil, "ARTWORK")
+    anchor(rule, content.child, 0, 46)
+    rule:SetSize(462, 1)
+    paints[#paints + 1] = function() paint(rule, "color.outline-variant") end
+    heading = Widgets.Text(content.child, "", "title")
+    anchor(heading, content.child, 0, 4)
+    moduleSwitch = Widgets.Toggle(content.child, "SETTINGS_MODULE_TOGGLE",
+        function() return currentModule and OpenUI:IsModuleEnabled(currentModule) end,
+        function(want)
+            if not currentModule then return end
+            if want then OpenUI:EnableModule(currentModule) else OpenUI:DisableModule(currentModule) end
+            refreshChrome()
         end)
-    end
-    scrollContent = CreateFrame("Frame", nil, scrollFrame)
+    anchor(moduleSwitch, content.child, 328, 0)
+    moduleSwitch:SetSize(126, 29)
+    aboutView = scrollView(frame, 24, 125, 672, 341, "OpenUISettingsAbout")
+    aboutView.bodyHeight = buildAbout(aboutView.child)
 
-    noResultsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    noResultsText:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -(HEADER_H + 16))
-    noResultsText:SetText(L.SETTINGS_NO_RESULTS)
-    noResultsText:Hide()
-    addLabelRef(noResultsText, function() noResultsText:SetText(L.SETTINGS_NO_RESULTS) end)
-
-    -- ==== 页脚（固定） ====
-    local footer = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 16, 10)
-    footer:SetText(L.SETTINGS_HINT)
-    addLabelRef(footer, function() footer:SetText(L.SETTINGS_HINT) end)
-
-    buildHub()
-    refreshTileStates()
-
-    buildModuleWindow()
-    Settings.CloseModule()
-
-    if type(UISpecialFrames) == "table" then
-        table.insert(UISpecialFrames, "OpenUISettings")
-    end
+    local bottom = CreateFrame("Frame", nil, frame)
+    anchor(bottom, frame, 1, 480)
+    bottom:SetSize(698, 39)
+    surface(bottom, "color.surface-container-high")
+    text(bottom, "SETTINGS_HINT", 19, 11, 400)
+    footer = button(bottom, "SETTINGS_ABOUT", 550, 5, 128, 29, openAbout)
+    if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "OpenUISettings") end
+    Theme.RegisterRefresh(refreshChrome)
+    for _, update in ipairs(localized) do update() end
+    selectCategory(1)
 end
 
--- ==== 公共 API ====
-function Settings.OpenModule(moduleName)
-    if not OpenUI.modules[moduleName] then return end
+function Settings.OpenModule(name)
     build()
-    currentModule = moduleName
-    clearModuleHost()
-    buildModuleHost()
-    local panel = modulePanels[moduleName]
-    if panel then
-        panel.build(modHost)
-    else
-        buildGenericPanel(modHost)
-    end
-    modTitle:SetText(moduleLabel(moduleName))
-    modWindow:Show()
-    Widgets.Refresh()
+    frame:Show()
+    if about then Settings.ReturnFromAbout() end
+    selectModule(name)
 end
 
 function Settings.CloseModule()
-    if modWindow then modWindow:Hide() end
+    if activePage and activePage.reset then activePage.reset() end
     currentModule = nil
+    render(true)
 end
 
 function Settings.Open()
     build()
     frame:Show()
-    refreshTileStates()
+    render()
 end
 
 function Settings.Close()
-    Settings.CloseModule()
-    if frame then frame:Hide() end
+    if not frame then return end
+    Settings.ReturnFromAbout()
+    if activePage and activePage.reset then activePage.reset() end
+    frame:Hide()
 end
 
 function Settings.IsOpen()
     return frame ~= nil and frame:IsShown()
 end
 
-function Settings.ApplyFilter(query)
-    query = (query or ""):lower()
-    local any = false
-    local perCategory = {}
-    for name, tile in pairs(hubTiles) do
-        local hit = query == ""
-        if not hit then
-            if moduleLabel(name):lower():find(query, 1, true) then
-                hit = true
-            else
-                local catLabel = L[CATEGORY_LABELS[categoryOrderOf(name)]] or ""
-                if catLabel:lower():find(query, 1, true) then hit = true end
+function Settings.ApplyFilter(value)
+    local nextQuery = (value or ""):lower()
+    if nextQuery == query then return end
+    if not frame then build() end
+    if not about and query == "" then previousSearch = { selectedCategory, currentModule } end
+    query = nextQuery
+    if query == "" and previousSearch then
+        selectedCategory, currentModule = previousSearch[1], previousSearch[2]
+        previousSearch = nil
+    elseif currentModule == nil or not matches(currentModule, selectedCategory) then
+        local hits = results(selectedCategory)
+        if #hits > 0 then
+            currentModule = hits[1]
+        else
+            currentModule = nil
+            for index in ipairs(categories) do
+                local names = results(index)
+                if #names > 0 then selectedCategory, currentModule = index, names[1]; break end
             end
         end
-        if hit then
-            tile.button:Show()
-            any = true
-            perCategory[tile.category] = true
-        else
-            tile.button:Hide()
-        end
     end
-    for category, section in pairs(categorySections) do
-        if perCategory[category] or query == "" then
-            section.frame:Show()
-        else
-            section.frame:Hide()
-        end
-    end
-    if noResultsText then
-        if (not any) and query ~= "" then noResultsText:Show() else noResultsText:Hide() end
-    end
+    render(true)
 end
 
 function Settings.Refresh()
     if not frame then return end
-    for i = 1, #labelRefs do
-        labelRefs[i].update()
-    end
-    refreshTileStates()
-    if currentModule and modWindow and modWindow:IsShown() then
-        modTitle:SetText(moduleLabel(currentModule))
-    end
-    Widgets.Refresh()
+    for _, update in ipairs(localized) do update() end
+    local marker = OpenUI.EditMode and OpenUI.EditMode.IsActive() and "● " or ""
+    editButton.themedLabel:SetText(marker .. L.SETTINGS_EDIT_MODE)
+    render()
 end
 
-Settings.IsModuleWindowShown = function()
-    return modWindow ~= nil and modWindow:IsShown()
-end
+Settings.IsModuleWindowShown = function() return Settings.IsOpen() and not about and currentModule ~= nil end
 Settings.CurrentModule = function() return currentModule end
-Settings.Tile = function(name) return hubTiles[name] end
-Settings.ContentHeight = function() return contentHeight end
-
+Settings.Tile = function(name) return tiles[name] end
+Settings.ContentHeight = function() return content and content.range + 341 or 0 end
 OpenUI.Settings = Settings
-
-OpenUI:RegisterModule("Settings", {})
+OpenUI:RegisterModule("Settings", { alwaysEnabled = true })

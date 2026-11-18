@@ -88,6 +88,7 @@ function OpenUI:IsModuleEnabled(name)
     if name == "Core" then return true end
     local module = self.modules[name]
     if not module then return false end
+    if module.alwaysEnabled then return true end
     local cfg = activeConfig(false)
     local enabled = cfg and cfg.modules and cfg.modules.enabled
     local saved = enabled and enabled[name]
@@ -115,6 +116,40 @@ function OpenUI.ApplyPendingSwitches()
     end
 end
 
+local function enableRuntime(name, module)
+    if not initialized[name] then
+        initialized[name] = true
+        if type(module.OnInitialize) == "function" then
+            Run(name .. "/OnInitialize", module.OnInitialize, module)
+        end
+    end
+    if type(module.OnEnable) == "function" then
+        Run(name .. "/OnEnable", module.OnEnable, module)
+    end
+end
+
+local function disableRuntime(name, module)
+    if OpenUI.Release then OpenUI.Release(name) end -- 先释放资源，再回调（#6 design 边界 7）
+    if type(module.OnDisable) == "function" then
+        Run(name .. "/OnDisable", module.OnDisable, module)
+    end
+end
+
+-- 档案切换后使已加载的模块与新配置一致，不把旧档案的值写回新档案。
+function OpenUI:RefreshProfileModules(previous)
+    for _, module in ipairs(self.moduleOrder) do
+        local name = module.name
+        pendingSwitches[name] = nil
+        if previous[name] ~= self:IsModuleEnabled(name) then
+            if previous[name] then
+                disableRuntime(name, module)
+            else
+                enableRuntime(name, module)
+            end
+        end
+    end
+end
+
 -- 启停状态机：状态先行、回调 Run 隔离（失败只进诊断，状态保持一致）。
 function OpenUI:EnableModule(name)
     if name == "Core" then return false end
@@ -128,21 +163,14 @@ function OpenUI:EnableModule(name)
         return false
     end
     setEnabled(name, true)
-    if not initialized[name] then
-        initialized[name] = true
-        if type(module.OnInitialize) == "function" then
-            Run(name .. "/OnInitialize", module.OnInitialize, module)
-        end
-    end
-    if type(module.OnEnable) == "function" then
-        Run(name .. "/OnEnable", module.OnEnable, module)
-    end
+    enableRuntime(name, module)
     return true
 end
 
 function OpenUI:DisableModule(name)
     if name == "Core" then return false end
     local module = self:GetModule(name)
+    if module.alwaysEnabled then return false end
     if not self:IsModuleEnabled(name) then
         pendingSwitches[name] = nil -- 最新命令（禁用）取消挂起的启用意图
         return true
@@ -152,10 +180,7 @@ function OpenUI:DisableModule(name)
         return false
     end
     setEnabled(name, false)
-    if OpenUI.Release then OpenUI.Release(name) end -- 先释放资源，再回调（#6 design 边界 7）
-    if type(module.OnDisable) == "function" then
-        Run(name .. "/OnDisable", module.OnDisable, module)
-    end
+    disableRuntime(name, module)
     return true
 end
 

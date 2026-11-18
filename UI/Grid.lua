@@ -252,13 +252,21 @@ local function registerSettingsPanel()
             local hint = Widgets.Text(host, L.SETTINGS_GRID_HINT, "body")
             hint:SetPoint("TOPLEFT", host, "TOPLEFT", 0, y - 4)
             hint:SetWidth(340)
+            return function()
+                sizeButton.themedLabel:SetText(L.SETTINGS_GRID_SIZE_FMT:format(Grid.GetSize()))
+                hint:SetText(L.SETTINGS_GRID_HINT)
+            end
         end,
     })
 end
 
-function Grid.OnEnable()
+function Grid.RefreshProfile()
     Grid.Rebuild()
     if gridConfig().shown then frame:Show() else frame:Hide() end
+end
+
+function Grid.OnEnable()
+    Grid.RefreshProfile()
     if Theme.RegisterRefresh then Theme.RegisterRefresh(paintSegments) end
 end
 
@@ -269,7 +277,7 @@ end
 OpenUI.Grid = Grid
 
 OpenUI:RegisterModule("Grid", {
-    defaultEnabled = false,
+    alwaysEnabled = true,
     OnEnable = function() Grid.OnEnable() end,
     OnDisable = function() Grid.OnDisable() end,
 })

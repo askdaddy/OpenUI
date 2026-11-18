@@ -59,6 +59,11 @@ function Locale.Get()
     return setting or "auto"
 end
 
+function Locale.Refresh()
+    apply(Locale.Get())
+    if OpenUI.Settings and OpenUI.Settings.Refresh then OpenUI.Settings.Refresh() end
+end
+
 -- 设置语言并即时生效：合法 → 写生效配置 + 重建 L；非法 → 软失败。
 function Locale.Set(locale)
     if type(locale) ~= "string" or not VALID[locale] then
@@ -66,15 +71,14 @@ function Locale.Set(locale)
         return false
     end
     activeConfig(true).locale = locale
-    apply(locale)
-    -- 已打开的设置窗口文案即时刷新（#8；未加载时零影响）
-    if OpenUI.Settings and OpenUI.Settings.Refresh then OpenUI.Settings.Refresh() end
+    Locale.Refresh()
     return true
 end
 
 OpenUI.Locale = Locale
 
 OpenUI:RegisterModule("Locale", {
+    alwaysEnabled = true,
     OnInitialize = function()
         local setting = _G.OpenUIDB and _G.OpenUIDB.locale
         if setting ~= nil and not VALID[setting] then
