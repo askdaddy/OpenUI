@@ -118,7 +118,7 @@ _G.OpenUIDB.modules.enabled.DeclaredOff = true
 check(OpenUI:IsModuleEnabled("DeclaredOff") == true, "DB 显式 true 覆盖注册声明")
 _G.OpenUIDB.modules.enabled.DeclaredOff = nil
 _G.OpenUIDB.modules.enabled.Theme = false
-check(OpenUI:IsModuleEnabled("Theme") == false, "DB 显式 false 覆盖默认")
+check(OpenUI:IsModuleEnabled("Theme") and not OpenUI:DisableModule("Theme"), "常驻 Theme 忽略历史 false 并拒绝关闭")
 _G.OpenUIDB.modules.enabled.Theme = nil
 
 print("== S2 生命周期筛选与启停状态机（步骤 2）==")
@@ -132,7 +132,7 @@ OpenUI:RegisterModule("ProbeOff", {
     defaultEnabled = false,
     OnEnable = function() seq[#seq + 1] = "F-enable" end,
 })
--- 预置 Theme=false + theme 定制 0.7：被禁模块的 OnInitialize 应跳过（定制不生效）
+-- 历史 Theme=false 不影响常驻主题初始化。
 _G.OpenUIDB = OpenUI.Config.MergeDefaults({
     theme = { ["opacity.panel"] = 0.7 },
     modules = { enabled = { Theme = false } },
@@ -142,19 +142,19 @@ coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 check(table.concat(seq, ",") == "O-init,O-enable",
     "仅启用模块执行生命周期（声明关的跳过）: " .. table.concat(seq, ","))
-check(OpenUI.Theme.Get("opacity.panel") == 0.88, "被禁 Theme 的 OnInitialize 未应用 DB 定制")
+check(OpenUI.Theme.Get("opacity.panel") == 0.7, "常驻 Theme 的 OnInitialize 应用 DB 定制")
 -- Enable：Core 拒绝 / 未注册报错 / 补初始化 / 幂等
 check(OpenUI:EnableModule("Core") == false, "Enable Core 被拒")
 local ok, err = pcall(function() return OpenUI:EnableModule("Ghost") end)
 check(not ok and tostring(err):find("Ghost", 1, true) ~= nil, "Enable 未注册名报错")
-local themeInitCalls = 0
-local themeModule = OpenUI:GetModule("Theme")
-local origInit = themeModule.OnInitialize
-themeModule.OnInitialize = function() themeInitCalls = themeInitCalls + 1 end
-check(OpenUI:EnableModule("Theme") == true and themeInitCalls == 1, "Enable 被禁模块补 OnInitialize 一次")
-themeModule.OnInitialize = origInit
-check(_G.OpenUIDB.modules.enabled.Theme == true, "Enable 写入 DB")
-check(OpenUI:EnableModule("Theme") == true and themeInitCalls == 1, "重复 Enable 幂等（不再初始化）")
+local initCalls = 0
+local probe = OpenUI:GetModule("ProbeOff")
+local origInit = probe.OnInitialize
+probe.OnInitialize = function() initCalls = initCalls + 1 end
+check(OpenUI:EnableModule("ProbeOff") == true and initCalls == 1, "Enable 被禁模块补 OnInitialize 一次")
+probe.OnInitialize = origInit
+check(_G.OpenUIDB.modules.enabled.ProbeOff == true, "Enable 写入 DB")
+check(OpenUI:EnableModule("ProbeOff") == true and initCalls == 1, "重复 Enable 幂等（不再初始化）")
 -- Disable：回调一次 + DB + 幂等
 check(OpenUI:DisableModule("ProbeOn") == true and seq[#seq] == "O-disable", "Disable 调用 OnDisable")
 check(OpenUI:DisableModule("ProbeOn") == true and seq[#seq] == "O-disable", "重复 Disable 幂等")

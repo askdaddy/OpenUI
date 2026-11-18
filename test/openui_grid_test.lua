@@ -72,7 +72,7 @@ local coreFrame = findCore()
 _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 coreFrame.scripts.OnEvent(coreFrame,"ADDON_LOADED","OpenUI")
 coreFrame.scripts.OnEvent(coreFrame,"PLAYER_LOGIN")
-ck(OpenUI:IsModuleEnabled("Grid") == false, "Grid default off")
+ck(OpenUI:IsModuleEnabled("Grid"), "Grid always available")
 OpenUI:EnableModule("Grid")
 ck(not Grid.IsShown(), "overlay hidden by default")
 local count48 = Grid.Rebuild()
@@ -115,8 +115,7 @@ for _, f in ipairs(frames) do
     if f.frameType == "Button" and f.themedLabel and f.themedLabel.text:find("Show grid",1,true) then found = true end
 end
 ck(found, "grid module panel has display toggle")
-OpenUI:DisableModule("Grid")
-ck(not Grid.IsShown(), "disable hides overlay")
+ck(not OpenUI:DisableModule("Grid") and not Grid.IsShown(), "module cannot be disabled; grid overlay remains hidden")
 print("== S5 增强：/openui grid <尺寸> 与拖拽淡入淡出 ==")
 local outs = {}
 local savedPrint2 = print

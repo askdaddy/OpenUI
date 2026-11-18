@@ -1,4 +1,4 @@
--- OpenUI 主控面板黑盒测试（Issue #46 冻结验收，QA 独立编写；替代 #8 旧交互测试）。
+-- OpenUI 主控导航、主题和搜索回归（#72）。
 -- 运行：lua test/openui_settings_test.lua
 
 local HERE = (arg[0]:match("^(.*)[/\\]") or ".")
@@ -49,9 +49,14 @@ local function mkframe(frameType, name, parent, template)
     function f:SetScript(n, fn) self.scripts[n] = fn end
     function f:CreateTexture() local x = mktex(); self.textures[#self.textures + 1] = x; return x end
     function f:CreateFontString() local x = mkfs(); self.fonts[#self.fonts + 1] = x; return x end
-    function f:SetSize() end
+    function f:SetSize(w, h) self.width, self.height = w, h end
     function f:SetPoint() end
     function f:SetAllPoints() end
+    function f:SetMinMaxValues(low, high) self.low, self.high = low, high end
+    function f:SetValue(v)
+        self.value = v
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, v) end
+    end
     function f:SetMovable() end
     function f:EnableMouse() end
     function f:RegisterForDrag() end
@@ -113,7 +118,7 @@ local order = {
     "Init.lua", "Locales/enUS.lua", "Locales/zhCN.lua", "Config/Defaults.lua",
     "Core/Core.lua", "Core/Resources.lua", "Core/Slash.lua", "Config/Profile.lua",
     "Locales/Manager.lua", "UI/Theme.lua", "UI/Widgets.lua", "UI/Settings.lua",
-    "UI/Diagnostics.lua", "UI/ActionBars.lua", "UI/Chat.lua", "UI/Native.lua",
+    "UI/Diagnostics.lua", "UI/ActionBars.lua", "UI/Grid.lua", "UI/Chat.lua", "UI/Native.lua",
     "UI/UnitFrames.lua", "UI/CastBars.lua", "UI/Auras.lua", "UI/Nameplates.lua",
     "UI/Restyle.lua", "UI/MinimapUI.lua", "UI/Media.lua",
 }
@@ -139,90 +144,81 @@ _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 
-local function fsByText(text)
-    for _, f in ipairs(frames) do
-        for _, fs in ipairs(f.fonts or {}) do
-            if fs.text == text then return fs end
-        end
-        for _, tex in ipairs(f.textures or {}) do end
-    end
+local function visible(f)
+    return f and f:IsShown() and (not f.parent or visible(f.parent))
 end
 
-local function buttonByText(text)
+local function buttons(text)
+    local found = {}
     for _, f in ipairs(frames) do
-        if f.frameType == "Button" and f.themedLabel and f.themedLabel.text == text then
-            return f
+        if f.frameType == "Button" and f.themedLabel and f.themedLabel.text == text and visible(f) then
+            found[#found + 1] = f
         end
     end
+    return found
+end
+
+local function click(text, index)
+    local button = assert(buttons(text)[index or 1], "Missing visible button: " .. text)
+    assert(button.scripts.OnClick, "No handler: " .. text)(button)
+end
+
+local function named(name)
     for _, f in ipairs(frames) do
-        if f.frameType == "Button" and f.themedLabel then
-            local t = f.themedLabel.text:gsub("^[●○%s]+", "")
-            if t == text then return f end
-        end
+        if f.name == name then return f end
     end
 end
 
-print("== S1 主控总览（步骤 1）==")
-local outBefore = #OpenUI.moduleOrder
-S.Open()
-check(S.IsOpen(), "/openui 打开主控面板")
-check(outBefore > 5, "注册模块数=" .. outBefore)
-local tiles = 0
-for _, module in ipairs(OpenUI.moduleOrder) do
-    if module.name ~= "Core" and S.Tile(module.name) then tiles = tiles + 1 end
+SlashCmdList.OPENUI("")
+check(S.IsOpen(), "/openui opens control panel")
+local root = named("OpenUISettings")
+check(root.width == 700 and root.height == 520, "approved panel dimensions")
+for _, tab in ipairs({ "Plugin Settings", "Combat HUD", "Maps & Quests", "Game Windows", "Social & Trade" }) do
+    check(#buttons(tab) == 1, "visible tab: " .. tab)
 end
-check(tiles == outBefore - 1, "磁贴数=注册模块数-1（" .. tiles .. "/" .. (outBefore - 1) .. "）")
-check(buttonByText("Theme & Widgets") ~= nil, "磁贴显示本地化模块名")
-check(fsByText("Core") ~= nil and fsByText("Combat HUD") ~= nil, "类目标题渲染（Core/Combat HUD）")
-
-print("== S2 模块小窗（步骤 2）==")
-S.OpenModule("Theme")
-check(S.IsModuleWindowShown() and S.CurrentModule() == "Theme", "点击磁贴打开模块小窗")
-check(buttonByText("teal") ~= nil, "Theme 小窗含配色按钮")
-buttonByText("teal").scripts.OnClick()
-check(Theme.GetPalette() == "teal", "小窗内配色即时生效")
-local toggle
-for _, f in ipairs(frames) do
-    if f.frameType == "Button" and f.themedLabel
-        and f.themedLabel.text:find("Enabled: ", 1, true) == 1 then
-        toggle = f
-    end
+check(S.CurrentModule() == "Theme", "Theme initially selected")
+check(#buttons("Enabled: On") == 0, "Theme has no module switch")
+for _, label in ipairs({ "Starblue", "Jade", "Amber", "Amethyst", "Rose", "Moss", "Graphite" }) do
+    check(#buttons(label) == 1, "visible palette: " .. label)
 end
-check(toggle ~= nil, "小窗含启用开关")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == false, "开关关闭模块生效")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == true, "开关重新启用")
-S.OpenModule("Diagnostics")
-check(S.CurrentModule() == "Diagnostics", "切换模块小窗")
-check(buttonByText("Open diagnostics") ~= nil, "诊断模块小窗含打开按钮")
-S.OpenModule("UnitFrames")
-check(fsByText("No options yet. Enable or disable this module here.") ~= nil,
-    "无专属设置模块显示提示")
-S.CloseModule()
-check(not S.IsModuleWindowShown(), "关闭小窗")
+local before = root.textures[1].r
+click("Jade")
+check(Theme.GetPalette() == "teal" and root.textures[1].r ~= before, "palette changes panel surface immediately")
+click("Layout Grid")
+check(S.CurrentModule() == "Grid" and #buttons("Enabled: On") == 0, "Grid is inline without a module switch")
+check(OpenUI:IsModuleEnabled("Grid") and #buttons("Show grid: Off") == 1, "Grid feature still has a display toggle")
+click("Combat HUD")
+check(S.CurrentModule() == "ActionBars", "tab opens first registered module")
+click("Unit Frames")
+check(S.CurrentModule() == "UnitFrames", "module row selects inline settings")
+check(Theme.GetPalette() == "teal", "palette persists across modules")
+click("Maps & Quests")
+check(S.CurrentModule() == "MinimapUI", "Maps & Quests opens Minimap")
+click("Plugin Settings")
+click("Diagnostics")
+local enabled = OpenUI:IsModuleEnabled("Diagnostics")
+click(enabled and "Enabled: On" or "Enabled: Off")
+check(OpenUI:IsModuleEnabled("Diagnostics") ~= enabled, "diagnostics module switch applies")
+check(#buttons("Open diagnostics") == 1, "diagnostics still has its own window entry")
+check(#buttons("Media Library") == 0 and #buttons("Settings") == 0, "internal infrastructure excluded")
 
-print("== S3 搜索（步骤 3）==")
 local box
 for _, f in ipairs(frames) do
-    if f.frameType == "EditBox" then box = f break end
+    if f.frameType == "EditBox" and visible(f) then box = f; break end
 end
-check(box ~= nil, "搜索框存在")
-box.text = "theme"
+box:SetText("combat hud")
 box.scripts.OnTextChanged(box)
-check(S.Tile("Theme").button:IsShown(), "命中磁贴保留")
-check(not S.Tile("Chat").button:IsShown(), "未命中磁贴隐藏")
-box.text = "xyz"
+check(S.CurrentModule() == "ActionBars" and #buttons("Unit Frames") == 1, "search matches localized category")
+box:SetText("xyz")
 box.scripts.OnTextChanged(box)
-check(not S.Tile("Theme").button:IsShown(), "无结果全部隐藏")
-box.text = ""
+check(S.CurrentModule() == nil and not S.IsModuleWindowShown(), "no match hides module contents")
+box:SetText("")
 box.scripts.OnTextChanged(box)
-check(S.Tile("Theme").button:IsShown() and S.Tile("Chat").button:IsShown(), "清空恢复")
-
-print("== S4 语言切换刷新（步骤 3）==")
+check(S.CurrentModule() == "Diagnostics", "clearing search restores selected module")
 Loc.Set("zhCN")
-check(buttonByText("主题与控件") ~= nil, "磁贴文案随语言刷新")
-check(fsByText("战斗界面") ~= nil, "类目标题随语言刷新")
+check(#buttons("插件设置") == 1 and #buttons("地图与任务") == 1 and #buttons("主题") == 1, "language redraws the whole navigation")
+S.Close()
+check(not S.IsOpen(), "close hides the control panel")
 
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then
