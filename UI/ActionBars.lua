@@ -373,6 +373,7 @@ local function registerSettingsPanel()
             local hint = Widgets.Text(host, L.SETTINGS_ACTIONBARS_HINT, "body")
             hint:SetPoint("TOPLEFT", host, "TOPLEFT", 0, y - 4)
             hint:SetWidth(340)
+            return function() hint:SetText(L.SETTINGS_ACTIONBARS_HINT) end
         end,
     })
 end

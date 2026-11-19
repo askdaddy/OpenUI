@@ -83,6 +83,7 @@ ck(AB.Bar("bar1").buttons[1]:GetAttribute("action") == 1, "bar1 pageable from sl
 ck(AB.MainBar():IsShown(), "main bar shown")
 ck(not bar2.frame:IsShown(), "bar2 hidden by default")
 S.Open()
+S.OpenModule("ActionBars")
 ck(S.Tile("ActionBars") ~= nil, "hub has ActionBars tile")
 S.OpenModule("ActionBars")
 local function btnByPrefix(pfx)

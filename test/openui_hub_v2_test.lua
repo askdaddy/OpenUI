@@ -1,4 +1,4 @@
--- OpenUI 主控面板黑盒测试（Issue #46 冻结验收，QA 独立编写；替代 #8 旧交互测试）。
+-- OpenUI 主控滚动、关于页和配置档交互回归（#72）。
 -- 运行：lua test/openui_settings_test.lua
 
 local HERE = (arg[0]:match("^(.*)[/\\]") or ".")
@@ -52,9 +52,14 @@ local function mkframe(frameType, name, parent, template)
     function f:SetScript(n, fn) self.scripts[n] = fn end
     function f:CreateTexture() local x = mktex(); self.textures[#self.textures + 1] = x; return x end
     function f:CreateFontString() local x = mkfs(); self.fonts[#self.fonts + 1] = x; return x end
-    function f:SetSize() end
+    function f:SetSize(w, h) self.width, self.height = w, h end
     function f:SetPoint() end
     function f:SetAllPoints() end
+    function f:SetMinMaxValues(low, high) self.low, self.high = low, high end
+    function f:SetValue(v)
+        self.value = v
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, v) end
+    end
     function f:SetMovable() end
     function f:EnableMouse() end
     function f:RegisterForDrag() end
@@ -121,7 +126,7 @@ local order = {
     "Init.lua", "Locales/enUS.lua", "Locales/zhCN.lua", "Config/Defaults.lua",
     "Core/Core.lua", "Core/Resources.lua", "Core/Slash.lua", "Config/Profile.lua",
     "Locales/Manager.lua", "UI/Theme.lua", "UI/Widgets.lua", "UI/Settings.lua",
-    "UI/Diagnostics.lua", "UI/ActionBars.lua", "UI/Chat.lua", "UI/Native.lua",
+    "UI/Diagnostics.lua", "UI/ActionBars.lua", "UI/Grid.lua", "UI/Chat.lua", "UI/Native.lua",
     "UI/UnitFrames.lua", "UI/CastBars.lua", "UI/Auras.lua", "UI/Nameplates.lua",
     "UI/Restyle.lua", "UI/MinimapUI.lua", "UI/Media.lua",
 }
@@ -147,117 +152,84 @@ _G.OpenUIDB = OpenUI.Config.MergeDefaults(nil)
 coreFrame.scripts.OnEvent(coreFrame, "ADDON_LOADED", "OpenUI")
 coreFrame.scripts.OnEvent(coreFrame, "PLAYER_LOGIN")
 
-local function fsByText(text)
+local function visible(f)
+    return f and f:IsShown() and (not f.parent or visible(f.parent))
+end
+
+local function buttons(text)
+    local found = {}
     for _, f in ipairs(frames) do
-        for _, fs in ipairs(f.fonts or {}) do
-            if fs.text == text then return fs end
+        if f.frameType == "Button" and f.themedLabel and f.themedLabel.text == text and visible(f) then
+            found[#found + 1] = f
         end
-        for _, tex in ipairs(f.textures or {}) do end
+    end
+    return found
+end
+
+local function click(text, index)
+    local button = assert(buttons(text)[index or 1], "Missing visible button: " .. text)
+    assert(button.scripts.OnClick, "No handler: " .. text)(button)
+end
+
+local function named(name)
+    for _, f in ipairs(frames) do
+        if f.name == name then return f end
     end
 end
 
-local function buttonByText(text)
-    for _, f in ipairs(frames) do
-        if f.frameType == "Button" and f.themedLabel and f.themedLabel.text == text then
-            return f
-        end
-    end
-    for _, f in ipairs(frames) do
-        if f.frameType == "Button" and f.themedLabel then
-            local t = f.themedLabel.text:gsub("^[●○%s]+", "")
-            if t == text then return f end
-        end
-    end
-end
-
-print("== S1 主控总览（步骤 1）==")
-local outBefore = #OpenUI.moduleOrder
 S.Open()
-check(S.IsOpen(), "/openui 打开主控面板")
-check(outBefore > 5, "注册模块数=" .. outBefore)
-local tiles = 0
-for _, module in ipairs(OpenUI.moduleOrder) do
-    if module.name ~= "Core" and S.Tile(module.name) then tiles = tiles + 1 end
-end
-check(tiles == outBefore - 1, "磁贴数=注册模块数-1（" .. tiles .. "/" .. (outBefore - 1) .. "）")
-check(buttonByText("Theme & Widgets") ~= nil, "磁贴显示本地化模块名")
-check(fsByText("Core") ~= nil and fsByText("Combat HUD") ~= nil, "类目标题渲染（Core/Combat HUD）")
-
-print("== S2 模块小窗（步骤 2）==")
-S.OpenModule("Theme")
-check(S.IsModuleWindowShown() and S.CurrentModule() == "Theme", "点击磁贴打开模块小窗")
-check(buttonByText("teal") ~= nil, "Theme 小窗含配色按钮")
-buttonByText("teal").scripts.OnClick()
-check(Theme.GetPalette() == "teal", "小窗内配色即时生效")
-local toggle
+click("Profiles")
+local P = OpenUI.Profile
+check(P.GetCurrent().mode == "independent", "starts on character's independent profile")
+check(#buttons("Create and link") == 5, "five account-wide slot rows")
+local panel = named("OpenUISettingsContent")
+local about = named("OpenUISettingsAbout")
+panel.scripts.OnMouseWheel(panel, -1)
+local originalOffset = panel.vScroll
+check(originalOffset > 0, "profile content scrolls")
+click("About OpenUI")
+check(visible(about) and not visible(named("OpenUISettingsModules")) and #buttons("Back") == 1, "About has separate navigation")
+check(#buttons("Combat HUD") == 0, "normal tabs hidden on About")
+about.scripts.OnMouseWheel(about, -100)
+check(about.vScroll == 195, "About wheel clamps at bottom")
+local slider
+for _, f in ipairs(frames) do if f.frameType == "Slider" and visible(f) then slider = f end end
+check(slider and slider.high == 195, "About overflow has a visible scrollbar")
+slider:SetValue(120)
+check(about.vScroll == 75, "scrollbar drag updates the body")
+local linkVisible = false
 for _, f in ipairs(frames) do
-    if f.frameType == "Button" and f.themedLabel
-        and f.themedLabel.text:find("Enabled: ", 1, true) == 1 then
-        toggle = f
+    if f.frameType == "EditBox" and visible(f) and f:GetText() == "https://github.com/askdaddy/OpenUI/issues" then
+        linkVisible = true
     end
 end
-check(toggle ~= nil, "小窗含启用开关")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == false, "开关关闭模块生效")
-toggle.scripts.OnClick()
-check(OpenUI:IsModuleEnabled("Theme") == true, "开关重新启用")
-S.OpenModule("Diagnostics")
-check(S.CurrentModule() == "Diagnostics", "切换模块小窗")
-check(buttonByText("Open diagnostics") ~= nil, "诊断模块小窗含打开按钮")
-S.OpenModule("UnitFrames")
-check(fsByText("No options yet. Enable or disable this module here.") ~= nil,
-    "无专属设置模块显示提示")
-S.CloseModule()
-check(not S.IsModuleWindowShown(), "关闭小窗")
+check(linkVisible, "About shows copyable Issues address")
+click("Back")
+check(S.CurrentModule() == "Profile" and panel.vScroll == originalOffset and not visible(about),
+    "Back restores the original module and scroll offset")
 
-print("== S3 搜索（步骤 3）==")
-local box
-for _, f in ipairs(frames) do
-    if f.frameType == "EditBox" then box = f break end
-end
-check(box ~= nil, "搜索框存在")
-box.text = "theme"
-box.scripts.OnTextChanged(box)
-check(S.Tile("Theme").button:IsShown(), "命中磁贴保留")
-check(not S.Tile("Chat").button:IsShown(), "未命中磁贴隐藏")
-box.text = "xyz"
-box.scripts.OnTextChanged(box)
-check(not S.Tile("Theme").button:IsShown(), "无结果全部隐藏")
-box.text = ""
-box.scripts.OnTextChanged(box)
-check(S.Tile("Theme").button:IsShown() and S.Tile("Chat").button:IsShown(), "清空恢复")
+Theme.SetPalette("amber")
+click("Create and link")
+check(P.GetCurrent().slot == 1 and Theme.GetPalette() == "starblue", "creating slot activates its theme")
+Theme.SetPalette("teal")
+click("Unlink")
+click("Restore character profile")
+check(P.GetCurrent().mode == "independent" and Theme.GetPalette() == "amber", "unlink can restore independent theme")
+click("Link")
+check(P.GetCurrent().slot == 1 and Theme.GetPalette() == "teal", "link reuses shared settings")
+click("Unlink")
+click("Copy shared settings")
+check(P.GetCurrent().mode == "independent" and Theme.GetPalette() == "teal", "unlink can copy shared settings")
 
-print("== S4 语言切换刷新（步骤 3）==")
-Loc.Set("zhCN")
-check(buttonByText("主题与控件") ~= nil, "磁贴文案随语言刷新")
-check(fsByText("战斗界面") ~= nil, "类目标题随语言刷新")
+local another = "Offline-Forever"
+_G.OpenUIDB.profiles.chars[another] = { mode = "slot", slot = 1, independent = {} }
+click("Delete")
+click("Cancel")
+check(P.Slots()[1].used, "cancel preserves slot")
+click("Delete")
+click("Delete")
+check(not P.Slots()[1].used and P.ConfigFor(another).theme.palette == "teal", "delete leaves offline linked character with a copy")
 
-print("== S6 v2：滚动容器与卡片边界（#71）==")
-local S2 = OpenUI.Settings
-check(S2.ContentHeight() > 100, "滚动内容已按分区实测布局（"..S2.ContentHeight().."px）")
--- 找到滚动帧（含 SetScrollChild 的 Frame）
-local scroller
-for _, f in ipairs(frames) do
-    if f.scrollChild then scroller = f end
-end
-check(scroller ~= nil, "ScrollFrame 存在且已挂内容")
-scroller.vRange = S2.ContentHeight() - 200
-scroller.scripts.OnMouseWheel(scroller, -1)
-check((scroller.vScroll or 0) == 40, "滚轮向下滚动 40px")
-scroller.scripts.OnMouseWheel(scroller, -100)
-check(scroller.vScroll == scroller.vRange, "滚动钳制到范围上限")
--- 卡片边界与状态点
-local tile = S2.Tile("Theme")
-check(tile ~= nil and #tile.edges == 4, "磁贴有四边边界（按钮可感知）")
-check(tile.dot ~= nil and tile.dot.text == "●", "启用模块状态点 ●")
-OpenUI:DisableModule("Theme")
--- refreshTileStates 经 Refresh 触发
-S2.Refresh()
-check(tile.dot.text == "○", "禁用后状态点 ○")
-check((tile.label.alpha or 1) < 1, "禁用模块标签变淡")
-OpenUI:EnableModule("Theme")
-S2.Refresh()
-check(tile.dot.text == "●", "重新启用恢复 ●")
 print(("== 结果: %d 通过, %d 失败 =="):format(passCount, failCount))
 if #failures > 0 then
     for _, f in ipairs(failures) do io.stderr:write("FAIL: " .. f .. "\n") end

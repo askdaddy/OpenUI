@@ -6,6 +6,7 @@
 
 ## 2026.11.0-dev.1（未发布）
 
+- 主控面板（#72）：顶部五类页签、左侧模块菜单、右侧配置及滚动区统一为单窗。主题可换色，常驻配置取消启停控制，右下「关于 OpenUI」可返回原模块，并提供项目、反馈与媒体共享说明。配置档接入角色独立档、五个账号共享槽及解除关联和删除确认。
 - 主控面板 v2（#71）：正文改**滚轮滚动容器**（ScrollFrame + SetScrollChild + OnMouseWheel，ForeverUI 纯 API 模式；内容高度按分区实测——30+ 模块不再溢出破窗）；磁贴升级为**卡片**（四边边界 + 底色 + 左对齐模块名 + 右侧独立状态点，禁用态整体变淡，悬停主色边框）；类目分区加主色竖条 + 计数徽标；页眉固定（标题/搜索/布局编辑/关闭 + 分隔线）、页脚提示固定；模块小窗升级标题带（深色带 + 3px 主色强调条 + 方形 × 关闭钮）。（#71）
 - Native v3（#70，按 examples/ForeverUI 实证策略）：受保护帧与 EditMode 管理帧（`IsProtected()`/`isManagedFrame`）不再 Hide/换父，改为就地淡化 alpha=0.0001 + 禁鼠标（恢复时可逆；避免 OnHide 污染 Edit Mode 管理表引发 taint 崩溃）；普通帧维持 Hide+SetParent；Snapshot 标注 `(fade)/(hidden)`；动作条原生清单补全（MainActionBar/MainMenuBar 美术件全系/Stance/Possess/MultiCast 等，帧名事实来源 ForeverUI）。（#70）
 - 善后修复（#69 跟进）：`Widgets.Edge` 增加 owner/anchor 分离（纹理不能 CreateTexture，此前单位框体/施法条把纹理当 owner 传入导致构建失败）；单位框体条描边与施法条描边改用正确锚点。全量 38 套件绿。（#69 跟进）

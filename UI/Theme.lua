@@ -244,6 +244,14 @@ end
 
 local Theme = {}
 
+function Theme.Refresh()
+    rebuild()
+end
+
+function Theme.GetPaletteColor(name)
+    return buildPalette(PALETTES[name] or PALETTES[DEFAULT_PALETTE]).primary
+end
+
 function Theme.RegisterRefresh(fn)
     if type(fn) == "function" then refreshHooks[#refreshHooks + 1] = fn end
 end
@@ -365,6 +373,7 @@ end
 
 -- ADDON_LOADED（默认已合并）后迁移并重建；文件加载时先以默认配色就绪。
 OpenUI:RegisterModule("Theme", {
+    alwaysEnabled = true,
     OnInitialize = function()
         migrateLegacyCustomizations()
         rebuild()
