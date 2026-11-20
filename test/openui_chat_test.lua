@@ -14,7 +14,7 @@ function GetAddOnMetadata(name, field)
     if name == "OpenUI" and field == "Version" then return "2026.11.0-dev.1" end
 end
 function GetLocale() return "enUS" end
-function UnitFullName() return "Seven" end
+function UnitFullName(unit) if unit == "player" then return "Seven" end end
 function GetRealmName() return "Forever" end
 
 local frames = {}
@@ -27,7 +27,8 @@ local function mktex()
     function t:SetSize(w, h) self.width, self.height = w, h end
     function t:ClearAllPoints() end
     function t:SetRotation(value) self.rotation = value end
-    function t:SetAlpha() end
+    function t:SetAlpha(value) self.alpha = value end
+    function t:GetAlpha() return self.alpha or 1 end
     function t:SetTexture() end
     return t
 end
@@ -53,6 +54,13 @@ local function mkframe(frameType, name, parent, template)
     function f:RegisterEvent(e) self.registered[e] = true end
     function f:UnregisterEvent(e) self.registered[e] = nil end
     function f:SetScript(n, fn) self.scripts[n] = fn end
+    function f:HookScript(n, fn)
+        local native = self.scripts[n]
+        self.scripts[n] = function(...)
+            if native then native(...) end
+            fn(...)
+        end
+    end
     function f:CreateTexture() local x = mktex(); self.textures[#self.textures + 1] = x; return x end
     function f:CreateFontString() local x = mkfs(); self.fonts[#self.fonts + 1] = x; return x end
     function f:SetSize(w, h)
@@ -80,6 +88,8 @@ local function mkframe(frameType, name, parent, template)
     function f:GetFrameLevel() return self.frameLevel or 1 end
     function f:SetFrameLevel(level) self.frameLevel = level end
     function f:GetScript(name) return self.scripts[name] end
+    function f:SetJustifyH(value) self.justify = value end
+    function f:GetJustifyH() return self.justify or "CENTER" end
     function f:SetResizable() end
     function f:SetClampedToScreen() end
     function f:SetResizeBounds() end
@@ -112,6 +122,9 @@ local function mkframe(frameType, name, parent, template)
     function f:Hide() self.shown = false end
     function f:IsShown() return self.shown end
     function f:SetAutoFocus() end
+    function f:SetFontObject() end
+    function f:SetFocus() self.focused = true end
+    function f:ClearFocus() self.focused = false end
     function f:SetMultiLine() end
     function f:SetText(s) self.text = s end
     function f:GetText() return self.text end
@@ -238,6 +251,9 @@ ChatTypeInfo = {
     CHANNEL2 = { id = 4, r = 1, g = 0.75, b = 0.6 },
 }
 local opened, linkClick
+local senderFilters = {}
+function ChatFrame_AddMessageEventFilter(event, callback) senderFilters[event] = callback end
+function UnitGUID(unit) if unit == "player" then return "Player-test-self" end end
 function ChatFrame_OpenChat(text, f) opened = { text, f }; ChatFrame1EditBox:SetText(text) end
 function hooksecurefunc(object, method, after)
     local native = object[method]
@@ -247,6 +263,16 @@ function hooksecurefunc(object, method, after)
     end
 end
 ChatFrame1:SetScript("OnHyperlinkClick", function(_, link, text, button) linkClick = { link, text, button } end)
+QuickJoinToastButton = mkframe("Button", "QuickJoinToastButton", UIParent)
+GeneralDockManager = mkframe("Frame", "GeneralDockManager", UIParent)
+CombatLogQuickButtonFrame = mkframe("Frame", "CombatLogQuickButtonFrame", ChatFrame2)
+ChatFrame2EditBox = mkChatFrame("ChatFrame2EditBox", true, true)
+local focusDecoration = mktex()
+function focusDecoration:GetObjectType() return "Texture" end
+function ChatFrame2EditBox:GetRegions() return focusDecoration end
+ChatFrame2EditBox:SetScript("OnEditFocusGained", function() focusDecoration:SetAlpha(1) end)
+ChatFrame2.Background = mktex()
+ChatFrame2.Background:SetAlpha(0.6)
 ChatFrame1EditBox:SetPoint("BOTTOMLEFT", ChatFrame1, "BOTTOMLEFT", 2, -18)
 ChatFrame1:AddMessage("|Hplayer:Initial|hInitial|h: already in history", 1, 1, 1, 3, 0, 101)
 OpenUI:EnableModule("Chat")
@@ -263,6 +289,12 @@ end
 local function click(f) return assert(f and f.scripts.OnClick)(f) end
 check(window:IsShown() and ChatFrame1:GetAlpha() == 0, "custom surface is visible and native message frame covered")
 check(ChatFrame1EditBox:GetParent() == window, "native edit box shares custom background")
+check(reader:GetJustifyH() == "LEFT", "chat messages are left-aligned")
+ChatFrame2EditBox.scripts.OnEditFocusGained(ChatFrame2EditBox)
+check(ChatFrame2EditBox:GetParent() == window and focusDecoration:GetAlpha() == 0
+    and ChatFrame2EditBox.bgColor[4] == 0, "focused secondary native editor uses integrated style")
+check(not QuickJoinToastButton:GetParent():IsShown() and not GeneralDockManager:GetParent():IsShown(),
+    "native social button and dock are suppressed")
 check(tab("General") and tab("Combat Log") and not tab("Guild"), "only two tabs at startup")
 check(reader:GetNumMessages() == 1, "native history loaded into General")
 ChatFrame1:AddMessage("|cff00ff00|Hplayer:Seven|hSeven|h|r: |Hitem:12|hBag|h", 0.3, 1, 0.4, 3, 0, 102)
@@ -284,6 +316,8 @@ click(tab("Back to latest"))
 check(reader:GetScrollOffset() == 0, "return to latest resets scroll")
 click(tab("Combat Log"))
 check(ChatFrame2:IsShown() and not reader:IsShown(), "combat tab keeps original log frame")
+check(ChatFrame2:GetJustifyH() == "LEFT" and ChatFrame2.Background:GetAlpha() == 0
+    and not CombatLogQuickButtonFrame:GetParent():IsShown(), "combat mode shows the text without native chrome")
 click(tab("General"))
 check(not ChatFrame2:IsShown() and reader:GetNumMessages() == 3, "general restores all channels")
 
@@ -297,11 +331,114 @@ local function sendButton(label)
         end
     end
 end
-check(sendButton("Trade") and not sendButton("Services") and not sendButton("Party"), "send choices reflect memberships")
+for _, channel in ipairs({ "Say", "Party", "Raid", "Instance", "Guild", "Yell", "Whisper" }) do
+    check(sendButton(channel), "fixed send channel is shown: " .. channel)
+end
+opened = nil
+click(sendButton("Party"))
+check(not opened, "unavailable fixed channel ignores clicks")
+check(sendButton("Trade") and not sendButton("Services"), "public choices reflect memberships")
 localParty = true
 resFrame.scripts.OnEvent(resFrame, "GROUP_ROSTER_UPDATE")
 click(sendButton("Party"))
 check(opened and opened[1] == "/p " and opened[2] == ChatFrame1, "send choice opens native editor without sending")
+
+local social, macro, recipient, selectedLanguage, emote
+function ToggleFriendsFrame() social = true end
+function ShowMacroFrame() macro = true end
+function GetNumLanguages() return 1 end
+function GetLanguageByIndex() return "Common", 1 end
+function ChatFrame1EditBox:SetGameLanguage(name, id) selectedLanguage = { name, id } end
+EmoteList, TextEmoteSpeechList = { "WAVE" }, { "HELLO" }
+function DoEmote(token) emote = token end
+MenuUtil = { CreateContextMenu = function(_, setup)
+    setup(nil, { CreateButton = function(_, _, callback) callback() end })
+end }
+ChatFrameUtil = { SendTell = function(name, native) recipient = { name, native } end }
+click(tab("O"))
+click(tab("M"))
+click(tab("L"))
+click(tab("E"))
+check(social and macro and selectedLanguage[1] == "Common" and emote == "WAVE", "left toolbar calls native actions")
+click(tab("T"))
+check(emote == "HELLO", "talk opens voice emote actions")
+opened = nil
+click(sendButton("Whisper"))
+local promptInput = frameBy(function(f) return f.frameType == "EditBox" and f.focused end)
+check(promptInput and not opened, "whisper opens recipient prompt without a Say slash draft")
+promptInput:SetText("Seven-Forever")
+promptInput.scripts.OnEnterPressed(promptInput)
+check(recipient and recipient[1] == "Seven-Forever" and recipient[2] == ChatFrame1 and not opened,
+    "recipient is passed to the native whisper entry")
+
+RAID_CLASS_COLORS = { MAGE = { colorStr = "ff3fc7eb" } }
+ITEM_QUALITY_COLORS = { [4] = { hex = "|cffa335ee" } }
+function UnitClass(unit) if unit == "player" then return "Mage", "MAGE" end end
+function UnitLevel(unit) if unit == "player" then return 60 end end
+function GetItemInfo(link)
+    if link == "item:99" then return "Relic", nil, 4 end
+end
+ChatFrame1:AddMessage("|Hplayer:Seven|hSeven|h: |Hitem:99|hRelic|h |Hplayer:Other|h[Other]|h", .3, 1, .4, 3, 0, 104)
+local colored = reader.lines[reader:GetNumMessages()][1]
+check(colored:find("|Hplayer:Seven|h|cff3fc7eb[60 Seven]|r|h", 1, true)
+    and colored:find("|Hitem:99|h|cffa335ee[Relic]|r|h", 1, true),
+    "known player level, class and item quality preserve hyperlink payload")
+check(colored:find("|Hplayer:Other|h[Other]|h", 1, true), "unknown class keeps channel color")
+ChatFrame1:AddMessage("|Hplayer:New|h[|cff3fc7ebNew|r]|h: |cffa335ee|Hitem:100|h[Uncached]|h|r", .3, 1, .4, 3, 0, 105)
+colored = reader.lines[reader:GetNumMessages()][1]
+check(colored:find("|Hplayer:New|h|cff3fc7eb[New]|r|h", 1, true)
+    and colored:find("|Hitem:100|h|cffa335ee[Uncached]|r|h", 1, true),
+    "native class color and uncached item quality are preserved")
+
+function GetNumGuildMembers() return 1 end
+function GetGuildRosterInfo() return "Guildie-Forever", nil, nil, 46 end
+C_FriendList = {
+    GetNumFriends = function() return 1 end,
+    GetFriendInfoByIndex = function() return { name = "Friend-Forever", level = 38 } end,
+}
+resFrame.scripts.OnEvent(resFrame, "GUILD_ROSTER_UPDATE")
+ChatFrame1:AddMessage("|Hplayer:Guildie|hGuildie|h |Hplayer:Friend|hFriend|h", .3, 1, .4, 3, 0, 106)
+colored = reader.lines[reader:GetNumMessages()][1]
+check(colored:find("[46 Guildie]", 1, true) and colored:find("[38 Friend]", 1, true),
+    "matching guild and friend roster levels appear outside the group")
+
+local sayFilter = assert(senderFilters.CHAT_MSG_SAY)
+local suppressed = sayFilter(ChatFrame1, "CHAT_MSG_SAY", "A sample", "Seven-Realm Alias",
+    nil, nil, nil, nil, nil, nil, nil, nil, 107, "Player-test-self")
+ChatFrame1:AddMessage("[Say] [Seven-Realm Alias]: A sample", 1, 1, 1, 1, 0, 107)
+colored = reader.lines[reader:GetNumMessages()][1]
+check(not suppressed and colored:find("[60 Seven-Realm Alias]", 1, true),
+    "raw sender GUID supplies own level even when the display line has no player hyperlink")
+
+local ownGUID = UnitGUID
+function UnitGUID(unit)
+    if unit == "party1" then return "Player-test-party" end
+    return ownGUID(unit)
+end
+function GetNumSubgroupMembers() return 1 end
+local ownLevel = UnitLevel
+function UnitLevel(unit) if unit == "party1" then return 54 end; return ownLevel(unit) end
+sayFilter(ChatFrame1, "CHAT_MSG_SAY", "Cross-realm sample", "Teammate-OtherRealm",
+    nil, nil, nil, nil, nil, nil, nil, nil, 108, "Player-test-party")
+ChatFrame1:AddMessage("[Say] [Teammate]: Cross-realm sample", 1, 1, 1, 1, 0, 108)
+colored = reader.lines[reader:GetNumMessages()][1]
+check(colored:find("[54 Teammate]", 1, true), "cross-realm speaker level resolved by party GUID")
+
+function GetPlayerInfoByGUID(guid)
+    if guid == "Player-test-stranger" then
+        return "Mage", "MAGE", "人类", "HUMAN", 3, "Stranger", "OtherRealm", 57
+    end
+end
+ChatFrame1:AddMessage("|Hplayer:Stranger:109|h[Stranger]|h: Hello", 1, 1, 1, 1, 0, 109, "CHAT_MSG_SAY",
+    { [1] = "Hello", [2] = "Stranger-OtherRealm", [11] = 109, [12] = "Player-test-stranger" })
+colored = reader.lines[reader:GetNumMessages()][1]
+check(colored:find("|Hplayer:Stranger:109|h[57 人类♀ Stranger]|h", 1, true),
+    "Forever event GUID supplies level, race and sex for an ungrouped speaker")
+
+function IsControlKeyDown() return true end
+reader.scripts.OnHyperlinkClick(reader, "player:Teammate-OtherRealm:109", "[Teammate]", "LeftButton")
+check(linkClick[1] == "player:Teammate-OtherRealm:109", "Ctrl-click returns to native player link behavior")
+IsControlKeyDown = nil
 
 local general = tab("General")
 general.scripts.OnDragStart(general)
@@ -325,6 +462,9 @@ check(Chat.GetMessageSize() == 17 and reader.font[2] == 17 and config.messageSiz
 
 OpenUI:DisableModule("Chat")
 check(not window:IsShown() and ChatFrame1:GetAlpha() == 1 and ChatFrame2:IsShown(), "disable restores the native frames")
+check(QuickJoinToastButton:GetParent() == UIParent and GeneralDockManager:GetParent() == UIParent
+    and CombatLogQuickButtonFrame:GetParent() == ChatFrame2 and ChatFrame2.Background:GetAlpha() == 0.6
+    and ChatFrame2:GetJustifyH() == "CENTER", "native chrome and alignment are restored")
 local _, relative, _, dx, dy = ChatFrame1EditBox:GetPoint(1)
 check(ChatFrame1EditBox:GetParent() == UIParent and relative == ChatFrame1 and dx == 2 and dy == -18,
     "disable restores native edit box parent and anchors")

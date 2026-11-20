@@ -109,8 +109,15 @@ local captured, nativeStates, inputTextures = {}, {}, {}
 local selected, active, lastProfile = "all", false, nil
 local initializationFailed
 local nativeChat, nativeLog, nativeEdit, selectedSend
+local hiddenChrome
+local toolsBar, whisperPrompt, whisperRecipient
+local activeTool
+local hookedEditors = setmetatable({}, { __mode = "k" })
 local layout
 local idsByKind = {}
+local rosterLevels
+local senderByFrame = setmetatable({}, { __mode = "k" })
+local installedSenderFilters = {}
 
 local function profileConfig()
     return OpenUI.Profile and OpenUI.Profile.Config() or _G.OpenUIDB
@@ -178,35 +185,35 @@ end
 
 local function sendOptions()
     local result = {}
-    local function add(key, label, command, colorKind)
-        result[#result + 1] = { key = key, label = label, command = command, color = eventColors(colorKind or key) }
+    local function add(key, label, command, colorKind, available)
+        result[#result + 1] = {
+            key = key, label = label, command = command, color = eventColors(colorKind or key),
+            available = available ~= false,
+        }
     end
+    local raid = IsInRaid and IsInRaid()
+    local party = not raid and IsInGroup and IsInGroup()
+    local instance = LE_PARTY_CATEGORY_INSTANCE and IsInGroup and IsInGroup(LE_PARTY_CATEGORY_INSTANCE)
+    local guild = IsInGuild and IsInGuild()
     add("SAY", L.CHAT_CHANNEL_SAY, "/s ")
+    add("PARTY", L.CHAT_CHANNEL_PARTY, "/p ", nil, not not party)
+    add("RAID", L.CHAT_CHANNEL_RAID, "/raid ", nil, not not raid)
+    add("INSTANCE_CHAT", L.CHAT_CHANNEL_INSTANCE, "/i ", nil, not not instance)
+    add("GUILD", L.CHAT_CHANNEL_GUILD, "/g ", nil, not not guild)
     add("YELL", L.CHAT_CHANNEL_YELL, "/y ")
     add("WHISPER", L.CHAT_CHANNEL_WHISPER, "/w ")
-    local raid = IsInRaid and IsInRaid()
-    if raid then
-        add("RAID", L.CHAT_CHANNEL_RAID, "/raid ")
-        if (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
-            (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) then
-            add("RAID_WARNING", L.CHAT_CHANNEL_RAID_WARNING, "/rw ")
-        end
-    elseif IsInGroup and IsInGroup() then
-        add("PARTY", L.CHAT_CHANNEL_PARTY, "/p ")
+
+    if raid and ((UnitIsGroupLeader and UnitIsGroupLeader("player")) or
+        (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))) then
+        add("RAID_WARNING", L.CHAT_CHANNEL_RAID_WARNING, "/rw ")
     end
-    if LE_PARTY_CATEGORY_INSTANCE and IsInGroup and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
-        add("INSTANCE_CHAT", L.CHAT_CHANNEL_INSTANCE, "/i ")
-    elseif IsInInstance then
+    if not instance and IsInInstance then
         local _, instanceType = IsInInstance()
         if instanceType == "pvp" then add("BATTLEGROUND", L.CHAT_CHANNEL_BATTLEGROUND, "/bg ") end
     end
-    if IsInGuild and IsInGuild() then
-        add("GUILD", L.CHAT_CHANNEL_GUILD, "/g ")
-        if C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote() then
-            add("OFFICER", L.CHAT_CHANNEL_OFFICER, "/o ")
-        elseif CanViewOfficerNote and CanViewOfficerNote() then
-            add("OFFICER", L.CHAT_CHANNEL_OFFICER, "/o ")
-        end
+    if guild and ((C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote())
+        or (CanViewOfficerNote and CanViewOfficerNote())) then
+        add("OFFICER", L.CHAT_CHANNEL_OFFICER, "/o ")
     end
     if GetChannelList then
         local values = { GetChannelList() }
@@ -222,11 +229,96 @@ local function sendOptions()
     return result
 end
 
+local function openNativeMenu(anchor)
+    local menu = _G.ChatFrameMenuButton
+    if menu and type(menu.OpenMenu) == "function" then
+        if menu.SetMenuAnchor and AnchorUtil and AnchorUtil.CreateAnchor then
+            menu:SetMenuAnchor(AnchorUtil.CreateAnchor("BOTTOMLEFT", anchor, "TOPLEFT", 0, 2))
+        end
+        if menu.IsMenuOpen and menu:IsMenuOpen() and menu.CloseMenu then menu:CloseMenu()
+        else menu:OpenMenu() end
+    elseif ChatFrame_ToggleMenu then
+        ChatFrame_ToggleMenu()
+    end
+end
+
+local function sendEmote(token)
+    if C_ChatInfo and C_ChatInfo.PerformEmote then C_ChatInfo.PerformEmote(token)
+    elseif DoEmote then DoEmote(token) end
+end
+
+local function openToolsMenu(anchor, kind)
+    if not MenuUtil or not MenuUtil.CreateContextMenu then return openNativeMenu(anchor) end
+    if kind == "language" then
+        if not (GetNumLanguages and GetLanguageByIndex and nativeEdit.SetGameLanguage) then
+            return openNativeMenu(anchor)
+        end
+        MenuUtil.CreateContextMenu(anchor, function(_, menu)
+            for i = 1, GetNumLanguages() do
+                local name, id = GetLanguageByIndex(i)
+                if name then menu:CreateButton(name, function() nativeEdit:SetGameLanguage(name, id) end) end
+            end
+        end)
+        return
+    end
+    local tokens = kind == "emote" and _G.EmoteList or _G.TextEmoteSpeechList
+    if type(tokens) ~= "table" or #tokens == 0 then return openNativeMenu(anchor) end
+    local names = {}
+    for i = 1, tonumber(MAXEMOTEINDEX) or 0 do
+        local token = _G["EMOTE" .. i .. "_TOKEN"]
+        if token then names[token] = _G["EMOTE" .. i .. "_CMD1"] end
+    end
+    MenuUtil.CreateContextMenu(anchor, function(_, menu)
+        for _, token in ipairs(tokens) do
+            menu:CreateButton(names[token] or token, function() sendEmote(token) end)
+        end
+    end)
+end
+
+local TOOL_DEFS = {
+    { "O", "CHAT_TOOL_SOCIAL", function()
+        if ToggleFriendsFrame then ToggleFriendsFrame()
+        elseif ToggleFriends then ToggleFriends() end
+    end },
+    { "E", "CHAT_TOOL_EMOTE", function(anchor) openToolsMenu(anchor, "emote") end },
+    { "M", "CHAT_TOOL_MACRO", function() if ShowMacroFrame then ShowMacroFrame() end end },
+    { "T", "CHAT_TOOL_TALK", function(anchor) openToolsMenu(anchor, "talk") end },
+    { "L", "CHAT_TOOL_LANGUAGE", function(anchor) openToolsMenu(anchor, "language") end },
+}
+
+local function prepareWhisper(name)
+    if ChatFrameUtil and ChatFrameUtil.SendTell then
+        ChatFrameUtil.SendTell(name, nativeChat)
+    elseif ChatFrame_SendTell then
+        ChatFrame_SendTell(name, nativeChat)
+    else
+        ChatFrame_OpenChat("", nativeChat)
+        if nativeEdit.SetTellTarget then nativeEdit:SetTellTarget(name)
+        else nativeEdit:SetAttribute("tellTarget", name) end
+        if nativeEdit.SetChatType then nativeEdit:SetChatType("WHISPER")
+        else nativeEdit:SetAttribute("chatType", "WHISPER") end
+        if nativeEdit.UpdateHeader then nativeEdit:UpdateHeader()
+        elseif ChatEdit_UpdateHeader then ChatEdit_UpdateHeader(nativeEdit) end
+    end
+    selectedSend = "WHISPER"
+    for _, entry in ipairs(sendButtons) do
+        if entry.option then entry.line:SetHeight(entry.option.key == selectedSend and 4 or 2) end
+    end
+end
+
 local function setSend(opt)
-    if not active or not ChatFrame_OpenChat then return end
+    if not active or not ChatFrame_OpenChat or not opt or not opt.available then return end
+    if opt.key == "WHISPER" then
+        if nativeEdit.ClearFocus then nativeEdit:ClearFocus() end
+        whisperRecipient:SetText("")
+        whisperPrompt:Show()
+        whisperRecipient:SetFocus()
+        return
+    end
+    whisperPrompt:Hide()
     local input = nativeEdit:GetText() or ""
     local previous = input:match("^/%S+%s+(.*)$") or input
-    if opt.key == "WHISPER" or selectedSend == "WHISPER" then previous = "" end
+    if selectedSend == "WHISPER" then previous = "" end
     selectedSend = opt.key
     ChatFrame_OpenChat(opt.command .. previous, nativeChat)
 end
@@ -235,7 +327,7 @@ local function refreshSender()
     if not active then return end
     local opts = sendOptions()
     local valid = false
-    for _, opt in ipairs(opts) do if opt.key == selectedSend then valid = true end end
+    for _, opt in ipairs(opts) do if opt.key == selectedSend and opt.available then valid = true end end
     if not valid then selectedSend = "SAY" end
     local width = (root:GetWidth() - 18) / #opts
     caption:Hide()
@@ -253,9 +345,9 @@ local function refreshSender()
             end)
             button:SetScript("OnEnter", function()
                 caption:ClearAllPoints()
-                caption:SetPoint("BOTTOM", button, "TOP", 0, 1)
+                caption:SetPoint("BOTTOM", entry.line, "TOP", 0, 2)
                 caption:SetText(entry.option.label)
-                colorText(caption, entry.option.color)
+                colorText(caption, entry.option.available and entry.option.color or role("on-surface-variant"))
                 caption:Show()
             end)
             button:SetScript("OnLeave", function() caption:Hide() end)
@@ -266,7 +358,7 @@ local function refreshSender()
         entry.button:SetPoint("LEFT", sender, "LEFT", (i - 1) * width, 0)
         entry.button:SetSize(math.max(1, width - 5), 20)
         paintTexture(entry.background, opt.color, 0)
-        paintTexture(entry.line, opt.color)
+        paintTexture(entry.line, opt.color, opt.available and 1 or .3)
         entry.line:SetHeight(opt.key == selectedSend and 4 or 2)
         entry.button:Show()
     end
@@ -280,15 +372,210 @@ local function stripColors(text)
     return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
-local function formatLine(text, stamp)
-    text = stripColors(text):gsub("(|H[%a]+:[^|]+|h)(.-)(|h)", function(opening, title, ending)
-        local kind = opening:match("^|H([%a]+):")
-        if (kind == "player" or kind == "BNplayer" or kind == "item") and title:sub(1, 1) ~= "[" then
-            title = "[" .. title .. "]"
+local function colorCode(color)
+    if not color then return end
+    if type(color.colorStr) == "string" then return color.colorStr:lower() end
+    if type(color.hex) == "string" then return color.hex:gsub("^|c", ""):lower() end
+    if color.r and color.g and color.b then
+        return ("ff%02x%02x%02x"):format(
+            math.floor(color.r * 255 + .5), math.floor(color.g * 255 + .5), math.floor(color.b * 255 + .5))
+    end
+end
+
+local function nativeColor(palette, embedded, preceding)
+    if not embedded and not preceding then return end
+    for _, color in pairs(palette or {}) do
+        local code = colorCode(color)
+        if code and (code == embedded or code == preceding) then return code end
+    end
+end
+
+local function rosterUnit(player, guid)
+    if not player then return end
+    local function lookup(unit)
+        if guid and UnitGUID then
+            local actual = UnitGUID(unit)
+            if issecretvalue and issecretvalue(actual) then return end
+            if actual then return actual == guid and unit or nil end
         end
-        return opening .. title .. ending
+        if not UnitFullName then return end
+        local name, realm = UnitFullName(unit)
+        if not name then return end
+        if realm == "" or not realm then
+            realm = GetRealmName and GetRealmName()
+        end
+        local key = player:lower():gsub("%s+", "")
+        if key ~= name:lower() and (not realm or key ~= (name .. "-" .. realm):lower():gsub("%s+", "")) then return end
+        return unit
+    end
+    local found = lookup("player")
+    if found then return found end
+    if UnitIsPlayer then
+        for _, token in ipairs({ "target", "mouseover", "focus" }) do
+            if UnitIsPlayer(token) then
+                found = lookup(token)
+                if found then return found end
+            end
+        end
+    end
+    local raid = IsInRaid and IsInRaid()
+    local count = raid and GetNumGroupMembers and GetNumGroupMembers()
+        or GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
+    for i = 1, count do
+        found = lookup((raid and "raid" or "party") .. i)
+        if found then return found end
+    end
+end
+
+local function validLevel(level)
+    return not (issecretvalue and issecretvalue(level)) and type(level) == "number" and level > 0
+end
+
+local function fullCharacterName(name)
+    if (issecretvalue and issecretvalue(name)) or type(name) ~= "string" or name == "" then return end
+    local character, realm = name:match("^([^-]+)-(.+)$")
+    if not character then
+        character, realm = name, GetRealmName and GetRealmName()
+    end
+    return character:lower() .. "-" .. (realm or ""):gsub("%s+", ""):lower()
+end
+
+local function validRace(race)
+    return not (issecretvalue and issecretvalue(race)) and type(race) == "string" and race ~= ""
+end
+
+local function sexSymbol(sex)
+    if issecretvalue and issecretvalue(sex) then return end
+    if sex == 2 then return "♂" end
+    if sex == 3 then return "♀" end
+end
+
+local function characterDetails(unit, player, guid)
+    local level = unit and UnitLevel and UnitLevel(unit)
+    local race = unit and UnitRace and UnitRace(unit)
+    local symbol = unit and UnitSex and sexSymbol(UnitSex(unit))
+    if not validLevel(level) then level = nil end
+    if not validRace(race) then race = nil end
+    if (not level or not race or not symbol) and type(guid) == "string"
+        and not (issecretvalue and issecretvalue(guid)) and guid:match("^Player%-") and GetPlayerInfoByGUID then
+        local ok, _, _, remoteRace, _, remoteSex, _, _, remoteLevel = pcall(GetPlayerInfoByGUID, guid)
+        if ok then
+            if not level and validLevel(remoteLevel) then level = remoteLevel end
+            if not race and validRace(remoteRace) then race = remoteRace end
+            symbol = symbol or sexSymbol(remoteSex)
+        end
+    end
+    if level then return level, race, symbol end
+    local full = fullCharacterName(player)
+    if not full then return nil, race, symbol end
+    if not rosterLevels then
+        rosterLevels = {}
+        local function remember(name, knownLevel)
+            if not validLevel(knownLevel) then return end
+            local key = fullCharacterName(name)
+            if key then rosterLevels[key] = knownLevel end
+        end
+        if IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo then
+            for i = 1, GetNumGuildMembers() do
+                local name, _, _, knownLevel = GetGuildRosterInfo(i)
+                remember(name, knownLevel)
+            end
+        end
+        local friends = C_FriendList
+        if friends and friends.GetNumFriends and friends.GetFriendInfoByIndex then
+            for i = 1, friends.GetNumFriends() do
+                local friend = friends.GetFriendInfoByIndex(i)
+                if friend then remember(friend.name, friend.level) end
+            end
+        end
+    end
+    return rosterLevels[full], race, symbol
+end
+
+local function linkColor(kind, target, title, preceding, unit)
+    local embedded = title:match("|c(%x%x%x%x%x%x%x%x)")
+    embedded = embedded and embedded:lower()
+    if kind == "player" or kind == "BNplayer" then
+        local color = nativeColor(RAID_CLASS_COLORS, embedded, preceding)
+        if color then return color end
+        if unit and UnitClass then
+            local _, class = UnitClass(unit)
+            return colorCode(RAID_CLASS_COLORS and RAID_CLASS_COLORS[class])
+        end
+    elseif kind == "item" then
+        local itemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+        if itemInfo then
+            local _, _, quality = itemInfo("item:" .. target)
+            local code = colorCode(ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality])
+            if code then return code end
+        end
+        return nativeColor(ITEM_QUALITY_COLORS, embedded, preceding)
+            or (not ITEM_QUALITY_COLORS and (embedded or preceding))
+    end
+end
+
+local function senderUnit(sender)
+    if not sender then return end
+    return rosterUnit(sender.name, sender.guid)
+end
+
+local function characterLabel(name, level, race, symbol)
+    local prefix = level and ("%d "):format(level) or ""
+    if race then prefix = prefix .. race .. (symbol or "") .. " " end
+    return "[" .. prefix .. name .. "]"
+end
+
+local function addPlainSenderDetails(line, sender)
+    local level, race, symbol = characterDetails(senderUnit(sender), sender.name, sender.guid)
+    if not level and not race then return line end
+    local body = sender.message and line:find(sender.message, 1, true)
+    if not body then return line end
+    local full = fullCharacterName(sender.name)
+    local short = (sender.name:match("^[^-]+") or sender.name):lower()
+    local replaced = false
+    local prefix = line:sub(1, body - 1):gsub("%[([^%]]+)%]", function(name)
+        if not replaced and (fullCharacterName(name) == full or name:lower() == short) then
+            replaced = true
+            return characterLabel(name, level, race, symbol)
+        end
+        return "[" .. name .. "]"
     end)
-    return stamp and "|cff9aaabd" .. stamp .. "|r  " .. text or text
+    return prefix .. line:sub(body)
+end
+
+local function formatLine(text, stamp, sender)
+    local parts = {}
+    local cursor = 1
+    while true do
+        local first, last, kind, target, title = text:find("|H([%a]+):([^|]+)|h(.-)|h", cursor)
+        if not first then break end
+        local prefix = text:sub(cursor, first - 1)
+        local before = prefix:match("|c(%x%x%x%x%x%x%x%x)$")
+        local player = kind == "player" and target:match("^[^:]+")
+        local unit = player and rosterUnit(player)
+        local senderMatch = player and sender and (fullCharacterName(player) == fullCharacterName(sender.name)
+            or player:lower() == (sender.name:match("^[^-]+") or sender.name):lower())
+        if senderMatch then unit = senderUnit(sender) or unit end
+        local color = linkColor(kind, target, title, before and before:lower(), unit)
+        local name = stripColors(title)
+        if kind == "player" or kind == "BNplayer" or kind == "item" then
+            if name:sub(1, 1) ~= "[" then name = "[" .. name end
+            if name:sub(-1) ~= "]" then name = name .. "]" end
+        end
+        if player then
+            local level, race, symbol = characterDetails(unit, senderMatch and sender.name or player,
+                senderMatch and sender.guid or nil)
+            name = characterLabel(name:sub(2, -2), level, race, symbol)
+        end
+        if color then name = "|c" .. color .. name .. "|r" end
+        parts[#parts + 1] = stripColors(prefix)
+        parts[#parts + 1] = "|H" .. kind .. ":" .. target .. "|h" .. name .. "|h"
+        cursor = last + 1
+    end
+    parts[#parts + 1] = stripColors(text:sub(cursor))
+    local line = table.concat(parts)
+    if sender and not text:find("|Hplayer:", 1, true) then line = addPlainSenderDetails(line, sender) end
+    return stamp and "|cff9aaabd" .. stamp .. "|r  " .. line or line
 end
 
 local function resolveType(id)
@@ -426,7 +713,7 @@ local function addTab(key, name, kind, locale)
     order[#order + 1] = key
 end
 
-local function append(line, r, g, b, chatID, lineID, historical)
+local function append(line, r, g, b, chatID, lineID, historical, sender)
     if type(line) ~= "string" or line == "" then return end
     if lineID and lineID ~= 0 and seen[lineID] then return end
     local kind = resolveType(chatID)
@@ -434,7 +721,7 @@ local function append(line, r, g, b, chatID, lineID, historical)
     local key, name, localized = channelIdentity(kind, line)
     local stamp = not historical and type(date) == "function" and date("%H:%M") or nil
     local color = colorKind and eventColors(colorKind) or { r or 1, g or 1, b or 1, 1 }
-    local row = { key = key, text = formatLine(line, stamp), color = color, id = lineID }
+    local row = { key = key, text = formatLine(line, stamp, sender), color = color, id = lineID }
     if #buffered == LIMIT then
         local old = table.remove(buffered, 1)
         if old.id then seen[old.id] = nil end
@@ -456,6 +743,7 @@ local function snapshotNative(frame, geometry)
         for i = 1, frame:GetNumPoints() do record.points[i] = { frame:GetPoint(i) } end
         record.level = frame:GetFrameLevel()
         record.parent = frame:GetParent()
+        if frame.GetJustifyH then record.justify = frame:GetJustifyH() end
     end
     nativeStates[frame] = record
 end
@@ -468,50 +756,128 @@ local function restoreNative()
             for _, point in ipairs(record.points) do frame:SetPoint(spread(point, 1, 5)) end
             frame:SetFrameLevel(record.level)
         end
+        if record.chrome then frame:SetParent(record.parent) end
+        if record.justify and frame.SetJustifyH then frame:SetJustifyH(record.justify) end
         frame:SetAlpha(record.alpha)
         frame:EnableMouse(record.mouse)
         if record.shown then frame:Show() else frame:Hide() end
     end
-    for texture, alpha in pairs(inputTextures) do texture:SetAlpha(alpha) end
+    for texture, record in pairs(inputTextures) do
+        texture:SetAlpha(record.alpha)
+        if record.shown ~= nil then
+            if record.shown then texture:Show() else texture:Hide() end
+        end
+    end
     nativeStates, inputTextures = {}, {}
 end
 
-local function cover(frame)
+local function cover(frame, chrome)
     if not frame or not frame.GetAlpha or not frame.IsMouseEnabled then return end
     if (frame.IsProtected and frame:IsProtected()) or (frame.IsForbidden and frame:IsForbidden()) then return end
     snapshotNative(frame)
+    local record = nativeStates[frame]
+    if chrome and not record.chrome and frame.SetParent then
+        record.parent = frame:GetParent()
+        record.chrome = true
+        frame:SetParent(hiddenChrome)
+    end
     frame:SetAlpha(0)
     frame:EnableMouse(false)
 end
 
-local function attachNative()
-    snapshotNative(nativeEdit, true)
-    snapshotNative(nativeLog, true)
-    for i = 1, tonumber(NUM_CHAT_WINDOWS) or 2 do
-        local f = _G["ChatFrame" .. i]
-        if f and f ~= nativeLog then cover(f) end
-        cover(_G["ChatFrame" .. i .. "Tab"])
+local function hideArt(texture)
+    if not texture or not texture.GetAlpha or not texture.SetAlpha then return end
+    if not inputTextures[texture] then
+        local record = { alpha = texture:GetAlpha() }
+        if texture.IsShown and texture.Show and texture.Hide then record.shown = texture:IsShown() end
+        inputTextures[texture] = record
     end
-    cover(_G.ChatFrameMenuButton)
-    cover(_G.ChatFrameChannelButton)
-    for _, suffix in ipairs({ "Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight" }) do
-        local texture = nativeEdit[suffix] or _G["ChatFrame1EditBox" .. suffix]
-        if texture and texture.GetAlpha and texture.SetAlpha then
-            inputTextures[texture] = texture:GetAlpha()
-            texture:SetAlpha(0)
+    texture:SetAlpha(0)
+    if texture.Hide then texture:Hide() end
+end
+
+local CHAT_ART = {
+    "Background", "TopTexture", "BottomTexture", "LeftTexture", "RightTexture",
+    "TopLeftTexture", "TopRightTexture", "BottomLeftTexture", "BottomRightTexture",
+}
+local CHAT_CHROME = {
+    "Tab", "ButtonFrame", "UpButton", "DownButton", "BottomButton", "ScrollBar", "ScrollToBottomButton",
+}
+local GLOBAL_CHROME = {
+    "ChatFrameMenuButton", "ChatFrameChannelButton", "ChatFrameSocialButton", "QuickJoinToastButton",
+    "GeneralDockManager", "ChatFrameToggleVoiceDeafenButton", "ChatFrameToggleVoiceMuteButton",
+    "CombatLogQuickButtonFrame", "CombatLogQuickButtonFrame_Custom",
+}
+
+local function suppressNativeChrome()
+    for i = 1, tonumber(NUM_CHAT_WINDOWS) or 2 do
+        local prefix = "ChatFrame" .. i
+        local frame = _G[prefix]
+        if frame and frame ~= nativeLog then cover(frame) end
+        for _, suffix in ipairs(CHAT_CHROME) do
+            cover(_G[prefix .. suffix], true)
+            if frame then cover(frame[suffix], true) end
+        end
+        for _, suffix in ipairs(CHAT_ART) do
+            hideArt(_G[prefix .. suffix])
+            if frame then hideArt(frame[suffix]) end
         end
     end
-    nativeEdit:SetParent(root)
-    nativeEdit:ClearAllPoints()
-    nativeEdit:SetPoint("BOTTOMLEFT", root, "BOTTOMLEFT", 9, 6)
-    nativeEdit:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", -9, 6)
-    nativeEdit:SetFrameLevel(root:GetFrameLevel() + 5)
-    nativeEdit:SetAlpha(1)
+    for _, name in ipairs(GLOBAL_CHROME) do cover(_G[name], true) end
+end
+
+local function flattenEditor(editor, prefix)
+    for _, suffix in ipairs({ "Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight" }) do
+        hideArt(editor[suffix])
+        hideArt(_G[prefix .. suffix])
+    end
+    if editor.GetRegions then
+        for _, region in ipairs({ editor:GetRegions() }) do
+            if region.GetObjectType and region:GetObjectType() == "Texture" then hideArt(region) end
+        end
+    end
+    if editor.SetBackdropColor then editor:SetBackdropColor(0, 0, 0, 0) end
+    if editor.SetBackdropBorderColor then editor:SetBackdropBorderColor(0, 0, 0, 0) end
+end
+
+local function attachEditors()
+    for i = 1, tonumber(NUM_CHAT_WINDOWS) or 2 do
+        local prefix = "ChatFrame" .. i .. "EditBox"
+        local frame = _G["ChatFrame" .. i]
+        local editor = _G[prefix] or (frame and frame.editBox)
+        if editor and not (editor.IsProtected and editor:IsProtected())
+            and not (editor.IsForbidden and editor:IsForbidden()) then
+            snapshot(editor)
+            snapshotNative(editor, true)
+            editor:SetParent(root)
+            editor:ClearAllPoints()
+            editor:SetPoint("BOTTOMLEFT", root, "BOTTOMLEFT", 9, 6)
+            editor:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", -9, 6)
+            editor:SetFrameLevel(root:GetFrameLevel() + 5)
+            editor:SetAlpha(1)
+            flattenEditor(editor, prefix)
+            if editor.HookScript and not hookedEditors[editor] then
+                local function onFocus(self)
+                    if active and nativeStates[self] then flattenEditor(self, prefix) end
+                end
+                editor:HookScript("OnShow", onFocus)
+                editor:HookScript("OnEditFocusGained", onFocus)
+                hookedEditors[editor] = true
+            end
+        end
+    end
+end
+
+local function attachNative()
+    snapshotNative(nativeLog, true)
+    suppressNativeChrome()
+    attachEditors()
     nativeLog:SetParent(root)
     nativeLog:ClearAllPoints()
     nativeLog:SetPoint("TOPLEFT", root, "TOPLEFT", 8, -8)
     nativeLog:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", -12, 34)
     nativeLog:SetFrameLevel(root:GetFrameLevel() + 2)
+    if nativeLog.SetJustifyH then nativeLog:SetJustifyH("LEFT") end
     if nativeLog.SetBackdropColor then nativeLog:SetBackdropColor(0, 0, 0, 0) end
     if nativeLog.SetBackdropBorderColor then nativeLog:SetBackdropBorderColor(0, 0, 0, 0) end
     if nativeEdit.SetBackdropColor then nativeEdit:SetBackdropColor(0, 0, 0, 0) end
@@ -529,6 +895,57 @@ local function supported()
     return true
 end
 
+local function buildTools()
+    toolsBar = {}
+    for i, def in ipairs(TOOL_DEFS) do
+        local entry = flatButton(root, def[1])
+        local button = entry.button
+        button:SetSize(24, 24)
+        button:SetPoint("TOPRIGHT", root, "TOPLEFT", -5, -(i - 1) * 28)
+        button:SetScript("OnClick", function(self)
+            if active then OpenUI.Run("Chat/" .. def[2], def[3], self) end
+        end)
+        button:SetScript("OnEnter", function(self)
+            activeTool = entry
+            paintTexture(entry.background, role("primary-container"))
+            if GameTooltip then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(L[def[2]])
+                GameTooltip:Show()
+            end
+        end)
+        button:SetScript("OnLeave", function()
+            activeTool = nil
+            paintTexture(entry.background, role("surface-container-high"), .86)
+            if GameTooltip then GameTooltip:Hide() end
+        end)
+        toolsBar[i] = entry
+    end
+
+    whisperPrompt = Widgets.Panel(root)
+    whisperPrompt:SetSize(250, 62)
+    whisperPrompt:SetPoint("BOTTOMLEFT", root, "BOTTOMLEFT", 9, 9)
+    whisperPrompt:SetFrameLevel(root:GetFrameLevel() + 8)
+    whisperPrompt.label = textAt(whisperPrompt, 10, 7, L.CHAT_WHISPER_RECIPIENT)
+    whisperRecipient = CreateFrame("EditBox", nil, whisperPrompt)
+    whisperRecipient:SetPoint("BOTTOMLEFT", whisperPrompt, "BOTTOMLEFT", 10, 6)
+    whisperRecipient:SetSize(230, 26)
+    whisperRecipient:SetAutoFocus(false)
+    whisperRecipient:SetFontObject("GameFontHighlight")
+    whisperRecipient:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+        whisperPrompt:Hide()
+    end)
+    whisperRecipient:SetScript("OnEnterPressed", function(self)
+        local name = (self:GetText() or ""):match("^%s*([^%s/|]+)%s*$")
+        if not name then return end
+        self:ClearFocus()
+        whisperPrompt:Hide()
+        prepareWhisper(name)
+    end)
+    whisperPrompt:Hide()
+end
+
 local function buildShell()
     root = CreateFrame("Frame", "OpenUIChat", UIParent)
     root:SetSize(540, 223)
@@ -536,7 +953,7 @@ local function buildShell()
     root:SetMovable(true)
     root:SetResizable(true)
     root:SetClampedToScreen(true)
-    if root.SetClampRectInsets then root:SetClampRectInsets(0, 0, 29, -23) end
+    if root.SetClampRectInsets then root:SetClampRectInsets(-29, 0, 29, -23) end
     if root.SetResizeBounds then root:SetResizeBounds(310, 138)
     elseif root.SetMinResize then root:SetMinResize(310, 138) end
     shell = root:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -547,6 +964,8 @@ local function buildShell()
     rule:SetHeight(1)
     -- 保证启动时没有半成品遮盖原生框。
     root:Hide()
+    hiddenChrome = CreateFrame("Frame", nil, UIParent)
+    hiddenChrome:Hide()
 
     tabStrip = CreateFrame("ScrollFrame", nil, root)
     tabStrip:SetPoint("BOTTOMLEFT", root, "TOPLEFT", 0, 5)
@@ -567,6 +986,7 @@ local function buildShell()
     reader:SetPoint("TOPLEFT", root, "TOPLEFT", 9, -10)
     reader:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", -17, 36)
     reader:SetMaxLines(LIMIT)
+    if reader.SetJustifyH then reader:SetJustifyH("LEFT") end
     reader:SetFading(false)
     reader:SetHyperlinksEnabled(true)
     reader:EnableMouse(true)
@@ -631,6 +1051,7 @@ local function buildShell()
         stroke:SetRotation(-math.pi / 4)
         grip.lines[i] = stroke
     end
+    buildTools()
     root:SetScript("OnSizeChanged", function()
         if not active then return end
         updateTabs()
@@ -646,6 +1067,13 @@ local function paintShell()
     paintTexture(thumb, role("outline"))
     for _, stroke in ipairs(grip.lines) do paintTexture(stroke, role("primary")) end
     latest.themedLabel:SetText(L.CHAT_LATEST)
+    whisperPrompt.label:SetText(L.CHAT_WHISPER_RECIPIENT)
+    colorText(whisperPrompt.label, role("on-surface"))
+    for _, entry in ipairs(toolsBar) do
+        paintTexture(entry.background, role(entry == activeTool and "primary-container" or "surface-container-high"), .86)
+        paintTexture(entry.line, role("outline-variant"))
+        colorText(entry.text, role("on-surface"))
+    end
     local font, _, flags = nativeEdit:GetFont()
     if font then reader:SetFont(font, Chat.GetMessageSize(), flags) end
     updateTabs()
@@ -658,7 +1086,7 @@ layout = function()
     if type(position) ~= "table" then
         root:SetSize(540, 223)
         root:ClearAllPoints()
-        root:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 24, 90)
+        root:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 34, 90)
         return
     end
     local w, h = tonumber(position.width) or 540, tonumber(position.height) or 223
@@ -667,13 +1095,55 @@ layout = function()
     root:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", tonumber(position.x) or 24, tonumber(position.y) or 90)
 end
 
+local function rememberSender(frame, _, message, name, _, _, _, _, _, _, _, _, lineID, guid)
+    if active and type(frame) == "table" and type(message) == "string" and type(name) == "string"
+        and not (issecretvalue and (issecretvalue(message) or issecretvalue(name))) and name ~= "" then
+        if issecretvalue and issecretvalue(guid) then guid = nil end
+        senderByFrame[frame] = { message = message, name = name, lineID = lineID, guid = guid }
+    end
+    return false
+end
+
+local function installSenderFilters()
+    local add = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
+    if not add then return end
+    local function register(name)
+        local event = "CHAT_MSG_" .. name
+        if not installedSenderFilters[event] and pcall(add, event, rememberSender) then
+            installedSenderFilters[event] = true
+        end
+    end
+    for _, def in ipairs(GROUPS) do register(def[1]) end
+    for kind in pairs(aliases) do register(kind) end
+    register("CHANNEL")
+end
+
+local function senderFromEvent(event, args)
+    if issecretvalue and (issecretvalue(event) or issecretvalue(args)) then return end
+    if type(event) ~= "string" or not event:match("^CHAT_MSG_") or type(args) ~= "table"
+        or (canaccessvalue and not canaccessvalue(args)) then return end
+    local message, name, guid = args[1], args[2], args[12]
+    if issecretvalue and (issecretvalue(message) or issecretvalue(name) or issecretvalue(guid)) then return end
+    if type(name) ~= "string" or name == "" then return end
+    return { name = name, message = type(message) == "string" and message or nil, guid = guid }
+end
+
 local function attachHooks()
+    installSenderFilters()
     for i = 1, tonumber(NUM_CHAT_WINDOWS) or 2 do
         local f = _G["ChatFrame" .. i]
         if f and f ~= nativeLog and f.AddMessage and not captured[f] then
-            hooksecurefunc(f, "AddMessage", function(_, text, r, g, b, id, _, lineID)
-                if active and (lineID and lineID ~= 0 or f == nativeChat) then
-                    append(text, r, g, b, id, lineID, false)
+            hooksecurefunc(f, "AddMessage", function(_, text, r, g, b, id, _, lineID, event, args)
+                if active then
+                    local sender = senderByFrame[f]
+                    senderByFrame[f] = nil
+                    local matchesID = sender and lineID and lineID ~= 0 and sender.lineID == lineID
+                    if sender and not matchesID and (type(text) ~= "string"
+                        or not text:find(sender.message, 1, true)) then sender = nil end
+                    sender = senderFromEvent(event, args) or sender
+                    if lineID and lineID ~= 0 or f == nativeChat then
+                        append(text, r, g, b, id, lineID, false, sender)
+                    end
                 end
             end)
             captured[f] = true
@@ -785,11 +1255,22 @@ function Chat.OnEnable()
         eventsRegistered = true
         local own = OpenUI.Own("Chat")
         own:On("PLAYER_ENTERING_WORLD", function()
-            if active then Chat.ApplyTheme() else attemptActivate() end
+            if active then
+                if OpenUI:CanModifyNow() then suppressNativeChrome() end
+                Chat.ApplyTheme()
+            else
+                attemptActivate()
+            end
+        end)
+        own:On("ADDON_LOADED", function()
+            if active and OpenUI:CanModifyNow() then suppressNativeChrome() end
         end)
         own:On("PLAYER_REGEN_ENABLED", function()
             if active then Chat.ApplyTheme() else attemptActivate() end
         end)
+        for _, event in ipairs({ "GUILD_ROSTER_UPDATE", "PLAYER_GUILD_UPDATE", "FRIENDLIST_UPDATE" }) do
+            own:On(event, function() rosterLevels = nil end)
+        end
         for _, event in ipairs({ "CHANNEL_UI_UPDATE", "GROUP_ROSTER_UPDATE", "PLAYER_GUILD_UPDATE", "ZONE_CHANGED_NEW_AREA" }) do
             own:On(event, refreshSender)
         end
@@ -800,6 +1281,7 @@ end
 function Chat.OnDisable()
     eventsRegistered = false
     active = false
+    if whisperPrompt then whisperPrompt:Hide() end
     if root then root:Hide() end
     restoreNative()
     for frame in pairs(originals) do restoreFrame(frame) end
@@ -814,8 +1296,9 @@ function Chat.OnDisable()
     end
     order = root and { "all", "combat" } or {}
     selected, buffered, seen = "all", {}, {}
-    selectedSend, lastProfile = nil, nil
+    selectedSend, lastProfile, rosterLevels = nil, nil, nil
     originals = {}
+    for frame in pairs(senderByFrame) do senderByFrame[frame] = nil end
 end
 
 Chat.Snapshot = function(frame) return originals[frame] end
